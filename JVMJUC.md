@@ -113,6 +113,181 @@ public static void main(String[] args) {
 
 ![image-20200611152756480](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200611152756480.png)
 
+3.多个线程顺序调度精确唤醒
+
+```java
+//使用多个condition实现
+class printdemo{
+    private  int numb=1; //A : 1 B : 2 C : 3
+    Lock lock=new ReentrantLock();
+    Condition c1=lock.newCondition();
+    Condition c2=lock.newCondition();
+    Condition c3=lock.newCondition();
+    public void printtest5(){
+        lock.lock();
+        try {
+            while (numb!=1){
+                c1.await();
+            }
+            for (int i = 1; i <= 1; i++) {
+                System.out.println(Thread.currentThread().getName()+"\t 打印了 "+i);
+            }
+            numb=2;//修改标志位
+            c2.signal();//精准唤醒B线程
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }finally {
+            lock.unlock();
+        }
+    }
+    public void printtest10(){
+        lock.lock();
+        try {
+            while (numb!=2){
+                c2.await();
+            }
+            for (int i = 1; i <= 2; i++) {
+                System.out.println(Thread.currentThread().getName()+"\t 打印了 "+i);
+            }
+            numb=3;//修改标志位
+            c3.signal();//精准唤醒B线程
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }finally {
+            lock.unlock();
+        }
+    }
+    public void printtest15(){
+        lock.lock();
+        try {
+            while (numb!=3){
+                c3.await();
+            }
+            for (int i = 1; i <= 3; i++) {
+                System.out.println(Thread.currentThread().getName()+"\t 打印了 "+i);
+            }
+            numb=1;//修改标志位
+            c1.signal();//精准唤醒B线程
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }finally {
+            lock.unlock();
+        }
+    }
+}
+public static void main(String[] args) {
+        printdemo printdemo=new printdemo();
+        new Thread(()->{
+            for (int i = 0; i < 10; i++) {
+                printdemo.printtest5();
+            }
+        },"AAA").start();
+        new Thread(()->{
+            for (int i = 0; i < 10; i++) {
+                printdemo.printtest10();
+            }
+        },"BBB").start();
+        new Thread(()->{
+            for (int i = 0; i < 10; i++) {
+                printdemo.printtest15();
+            }
+        },"CCC").start();
+    }
+```
+
+![image-20200611162412315](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200611162412315.png)
+
+#### 多线程的获得方式
+
+##### 1.前两种
+
+![image-20200611163612170](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200611163612170.png)
+
+##### 2.使用**Callable接口**
+
+现在我们观察里面的run方法，返回的都是void，也就是说这两种方式都不能返回处理后的结构。但是Callable接口的出现可以有效地解决这一问题
+
+我们先来看Thread的构造方法：
+
+![image-20200611163735002](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200611163735002.png)
+
+这个源码我摘自jdk1.8，一共列举了9个构造函数，但是仔细观察就能发现，没有一个构造方法可以传入Callable接口，这也就意味着不能根据之前那简单的方式来创建线程。这时候怎么办呢？那就得换一种思考方式。
+
+既然线程能有返回值，不知道是否可以联想到一个函数式接口Future，我们以此为基点进行查询
+
+![image-20200611163852642](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200611163852642.png)
+
+![image-20200611163906075](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200611163906075.png)
+
+这就是一个最基本的使用方法。当然Future还提供了很多其他的方法：
+
+（1）cancel方法用来取消任务，如果取消任务成功则返回true，如果取消任务失败则返回false。
+
+参数mayInterruptIfRunning表示是否允许取消正在执行却没有执行完毕的任务，如果设置true，则表示可以取消正在执行过程中的任务。如果任务已经完成，则无论mayInterruptIfRunning为true还是false，此方法肯定返回false，即如果取消已经完成的任务会返回false；
+
+如果任务正在执行，若mayInterruptIfRunning设置为true，则返回true，
+
+若mayInterruptIfRunning设置为false，则返回false；
+
+如果任务还没有执行，则无论mayInterruptIfRunning为true还是false，肯定返回true。
+
+（2）isCancelled方法表示任务是否被取消成功，如果在任务正常完成前被取消成功，则返回 true。
+
+（3）isDone方法表示任务是否已经完成，若任务完成，则返回true；
+
+（4）get()方法用来获取执行结果，这个方法会产生阻塞，会一直等到任务执行完毕才返回；
+
+（5）get(long timeout, TimeUnit unit)用来获取执行结果，如果在指定时间内，还没获取到结果，就直接返回null。
+
+基本上就是这样。其实经常会配合着ExecutorService来使用，现在我们举个例子来看一下：
+
+![image-20200611164348858](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200611164348858.png)
+
+##### Callable和Runnable的区别
+
+相同点：
+
+1、两者都是接口
+
+2、两者都需要调用Thread.start启动线程
+
+不同点：
+
+1、如上面代码所示，callable的核心是call方法，允许返回值，runnable的核心是run方法，没有返回值
+
+2、call方法可以抛出异常，但是run方法不行
+
+3、因为runnable是java1.1就有了，所以他不存在返回值，后期在java1.5进行了优化，就出现了callable，就有了返回值和抛异常
+
+4、callable和runnable都可以应用于executors。而thread类只支持runnable
+
+测试：使用线程池来运行
+
+```java
+public static void main(String[] args) throws Exception{
+		//1 创建一个线程池
+		//调用Executors类的静态方法
+		ExecutorService service = Executors.newFixedThreadPool(10);
+		//2提交runnable对象
+		service.submit(new Runnable() {
+			@Override
+			public void run() {
+			}
+		});
+		//3 提交callable对象
+		service.submit(new Callable<String>() {
+			@Override
+			public String call() throws Exception {
+				return null;
+			}
+		});
+		//4 关闭线程池
+		service.shutdown();
+	}
+```
+
+#### java线程池
+
 
 
 #### 进程和线程
