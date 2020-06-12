@@ -379,13 +379,18 @@ submit(Runnable task, T result)能通过传入的载体result间接获得线程�
 
 Future.get方法会使取结果的线程进入阻塞状态，知道线程执行完成之后，唤醒取结果的线程，然后返回结果。
 
+#### java中创建线程池的方式一般有两种：
+
+- **通过Executors工厂方法创建**
+- **通过自定义new `ThreadPoolExecutor(int corePoolSize, int maximumPoolSize, long keepAliveTime, TimeUnit unit, BlockingQueue<Runnable> workQueue)自定义创建`**
+
 #### 阿里巴巴开发者手册不建议开发者使用Executors创建线程池
 
 **newFixedThreadPool和newSingleThreadPoolExecutor都是创建固定线程的线程池, 尽管它们的线程数是固定的，但是它们的阻塞队列的长度却是Integer.MAX_VALUE的,所以， 队列的任务很可能过多，导致OOM。**
 
-**newCacheThreadPool和newScheduledThreadPool创建出来的线程池的线程数量却是Integer.MAX_VALUE的， 如果任务数量过多,也很可能发生OOM。**
+**newCacheThreadPool(可缓存线程池)和newScheduledThreadPool(定长线程池)创建出来的线程池的线程数量却是Integer.MAX_VALUE的， 如果任务数量过多,也很可能发生OOM。**
 
-
+推荐使用通过自定义new  ThreadPoolExecutor 这种方式创建
 
 ### 并发队列阻塞式与非阻塞式的区别
 
@@ -409,15 +414,15 @@ Future.get方法会使取结果的线程进入阻塞状态，知道线程执行�
 
 阻塞队列与普通队列的区别在于，当队列是空的时，从队列中获取元素的操作将会被阻塞，或者当队列是满时，往队列里添加元素的操作会被阻塞。试图从空的阻塞队列中获取元素的线程将会被阻塞，直到其他的线程往空的队列插入新的元素。同样，试图往已满的阻塞队列中添加新元素的线程同样也会被阻塞，直到其他的线程使队列重新变得空闲起来，如从队列中移除一个或者多个元素，或者完全清空队列.
 
-1.ArrayDeque, （数组双端队列） 
-2.PriorityQueue, （优先级队列） 
-3.ConcurrentLinkedQueue, （基于链表的并发队列） 
-4.DelayQueue, （延期阻塞队列）（阻塞队列实现了BlockingQueue接口） 
-5.ArrayBlockingQueue, （基于数组的并发阻塞队列） 
-6.LinkedBlockingQueue, （基于链表的FIFO阻塞队列） 
-7.LinkedBlockingDeque, （基于链表的FIFO双端阻塞队列） 
-8.PriorityBlockingQueue, （带优先级的无界阻塞队列） 
-9.SynchronousQueue （并发同步阻塞队列）
+   1.ArrayDeque, （数组双端队列） 
+   2.PriorityQueue, （优先级队列） 
+	3.ConcurrentLinkedQueue, （基于链表的并发队列） 
+	4.DelayQueue, （延期阻塞队列）（阻塞队列实现了BlockingQueue接口） 
+	5.ArrayBlockingQueue, （基于数组的并发阻塞队列） 
+	6.LinkedBlockingQueue, （基于链表的FIFO阻塞队列） 
+	7.LinkedBlockingDeque, （基于链表的FIFO双端阻塞队列） 
+	8.PriorityBlockingQueue, （带优先级的无界阻塞队列） 
+	9.SynchronousQueue （并发同步阻塞队列）
 
 #### ConcurrentLinkedQueue
 
@@ -437,9 +442,9 @@ poll() 和peek() 都是取头元素节点，区别在于前者会删除元素，
 
 BlockingQueue即阻塞队列，从阻塞这个词可以看出，在某些情况下对阻塞队列的访问可能会造成阻塞。被阻塞的情况主要有如下两种：
 
-\1. 当队列满了的时候进行入队列操作
+1. 当队列满了的时候进行入队列操作
 
-\2. 当队列空了的时候进行出队列操作
+2. 当队列空了的时候进行出队列操作
 
 因此，当一个线程试图对一个已经满了的队列进行入队列操作时，它将会被阻塞，除非有另一个线程做了出队列操作；同样，当一个线程试图对一个空队列进行出队列操作时，它将会被阻塞，除非有另一个线程进行了入队列操作。
 
