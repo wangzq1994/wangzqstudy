@@ -386,7 +386,7 @@ Future.get方法会使取结果的线程进入阻塞状态，知道线程执行�
 
 #### 阿里巴巴开发者手册不建议开发者使用Executors创建线程池
 
-**newFixedThreadPool和newSingleThreadPoolExecutor都是创建固定线程的线程池, 尽管它们的线程数是固定的，但是它们的阻塞队列的长度却是Integer.MAX_VALUE的,所以， 队列的任务很可能过多，导致OOM。**
+**newFixedThreadPool(固定大小)和newSingleThreadPoolExecutor(单线程化的线程池)都是创建固定线程的线程池, 尽管它们的线程数是固定的，但是它们的阻塞队列的长度却是Integer.MAX_VALUE的,所以， 队列的任务很可能过多，导致OOM。**
 
 **newCacheThreadPool(可缓存线程池)和newScheduledThreadPool(定长线程池)创建出来的线程池的线程数量却是Integer.MAX_VALUE的， 如果任务数量过多,也很可能发生OOM。**
 
