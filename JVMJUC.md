@@ -366,7 +366,7 @@ Executors类提供了4种不同的线程池：newCachedThreadPool, newFixedThrea
 
 4、newScheduledThreadPool：适用于执行延时或者周期性任务。
 
-#### 8、execute()和submit()方法
+##### 8、execute()和submit()方法
 
 1、execute()，执行一个任务，没有返回值。
 
@@ -424,7 +424,7 @@ Future.get方法会使取结果的线程进入阻塞状态，知道线程执行�
 	8.PriorityBlockingQueue, （带优先级的无界阻塞队列） 
 	9.SynchronousQueue （并发同步阻塞队列）
 
-#### ConcurrentLinkedQueue
+##### ConcurrentLinkedQueue
 
 ConcurrentLinkedQueue : 是一个适用于高并发场景下的队列，通过无锁的方式，实现了高并发状态下的高性能，通常ConcurrentLinkedQueue性能好于BlockingQueue.它是一个基于链接节点的无界线程安全队列。该队列的元素遵循先进先出的原则。头是最先加入的，尾是最近加入的，该队列不允许null元素。
 
@@ -432,7 +432,7 @@ ConcurrentLinkedQueue重要方法:
 add 和offer() 都是加入元素的方法(在ConcurrentLinkedQueue中这俩个方法没有任何区别)
 poll() 和peek() 都是取头元素节点，区别在于前者会删除元素，后者不会。
 
-### BlockingQueue
+##### BlockingQueue
 
 阻塞队列（BlockingQueue）是一个支持两个附加操作的队列。这两个附加的操作是：
 
@@ -468,7 +468,7 @@ BlockingQueue即阻塞队列，从阻塞这个词可以看出，在某些情况�
 
  
 
-#### **ArrayBlockingQueue**
+##### **ArrayBlockingQueue**
 
 ArrayBlockingQueue是一个有边界的阻塞队列，它的内部实现是一个数组。有边界的意思是它的容量是有限的，我们必须在其初始化的时候指定它的容量大小，容量大小一旦指定就不可改变。
 
@@ -476,19 +476,71 @@ ArrayBlockingQueue是以先进先出的方式存储数据，最新插入的对�
 
  
 
-### LinkedBlockingQueue
+##### LinkedBlockingQueue
 
 LinkedBlockingQueue阻塞队列大小的配置是可选的，如果我们初始化时指定一个大小，它就是有边界的，如果不指定，它就是无边界的。说是无边界，其实是采用了默认大小为Integer.MAX_VALUE的容量 。它的内部实现是一个链表。和ArrayBlockingQueue一样，LinkedBlockingQueue 也是以先进先出的方式存储数据，最新插入的对象是尾部，最新移出的对象是头部。
 
-### PriorityBlockingQueue
+##### PriorityBlockingQueue
 
 PriorityBlockingQueue是一个没有边界的队列，它的排序规则和 java.util.PriorityQueue一样。需要注 意，PriorityBlockingQueue中允许插入null对象。
 
 所有插入PriorityBlockingQueue的对象必须实现 java.lang.Comparable接口，队列优先级的排序规则就 是按照我们对这个接口的实现来定义的。另外，我们可以从PriorityBlockingQueue获得一个迭代器Iterator，但这个迭代器并不保证按照优先级顺 序进行迭代。
 
-### SynchronousQueue
+##### SynchronousQueue
 
 SynchronousQueue队列内部仅允许容纳一个元素。当一个线程插入一个元素后会被阻塞，除非这个元素被另一个线程消费。
+
+### JVM
+
+![image-20200613173015963](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200613173015963.png)
+
+JDK8之前:（图中灰色的表示是私有且没有GC垃圾回收）
+
+- 线程私有的部分有:程序计数器(PC寄存器),JAVA虚拟机栈,本地方法栈(native)。
+- 线程共享部分有: GC堆,永久代(是方法区的一种实现)。
+
+JDK8之后:
+
+- 线程私有的部分不变, 线程共享部分的永久代改为了元空间(MetaSpace) (永久代和元空间都是方法区的实现),字符串常量池也移动到了heap空间
+
+##### 类加载器
+
+![image-20200613204707861](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200613204707861.png)
+
+![image-20200613204803829](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200613204803829.png)
+
+##### 双亲委派机制
+
+![image-20200613205014068](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200613205014068.png)
+
+**双亲委派机制是为了防止类被重复加载，避免核心API遭到恶意破坏。** 如Object类，它由BootstrapClassLoader在JVM启动时加载。 如果没有双亲委派机制，那么Object类就可以被重写，其带来的后果将无法想象。
+
+**在加载一个类时，是由下自上判断类是否被加载的。如果类没有被加载， 就由上自下尝试加载类。**
+
+##### Native Interface
+
+![image-20200613205308520](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200613205308520.png)
+
+native 标注的方法 是调用第三方的函数库 或者 底层操作系统的 了解就可以
+
+##### PC寄存器(程序计数器)
+
+![image-20200613205519842](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200613205519842.png)
+
+程序计数器的特点
+
+1. 如果当前线程执行的是java方法，那么程序计数器记录的是字节码指令的地址。
+2. 如果当前线程执行的native方法，那么程序计数器记录的值为空(undefined)。
+3. 程序计数器这部分内存区域是JVM中唯一不会出现OOM错误的区域
+4. 程序计数器的生命周期与线程相同,即程序计数器随着线程创建而创建， 随着线程的销毁而销毁。
+
+##### Method Area 方法区
+
+![image-20200613210018492](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200613210018492.png)
+
+
+
+
 
 #### 进程和线程
 
