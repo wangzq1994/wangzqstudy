@@ -538,9 +538,41 @@ native 标注的方法 是调用第三方的函数库 或者 底层操作系统�
 
 ![image-20200613210018492](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200613210018492.png)
 
+##### Java栈
 
+栈管运行,堆管存储
 
+![image-20200614213534929](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200614213534929.png)
 
+**Java方法 ====栈帧**    
+
+![image-20200614214014332](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200614214014332.png)
+
+![image-20200614214245928](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200614214245928.png)
+
+![image-20200614214945751](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200614214945751.png)
+
+Java虚拟机栈与程序计数器一样，都是线程私有的部分，生命周期也跟线程一样。
+
+**Java虚拟机栈描述的是Java方法运行时的内存模型，它由一个一个的栈帧组成。**
+
+##### 栈+堆+方法区的交互关系
+
+![image-20200614215328451](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200614215328451.png)
+
+##### Heap 堆
+
+![image-20200614220003405](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200614220003405.png)
+
+**堆是JVM中内存占用最大的一块区域，它是所有线程共享的一块区域。 堆的作用是为对象分配内存并存储和回收它们。 堆是垃圾回收的主要区域，所以堆区也被成为GC堆。**
+
+堆区可以划分为 **新生代(Young Generation),老年代(Old Generation)** 和 永久代(Permanent Generation),但永久代已被元空间代替, **元空间存储的是类的元信息，几乎不可能发生GC。**
+
+新生代再细分可以分为: **Eden空间，From Survivor空间(from区)和To Survivor空间(TO区)。**
+
+![image-20200614220540962](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200614220540962.png)
+
+![image-20200614220911672](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200614220911672.png)
 
 #### 进程和线程
 
