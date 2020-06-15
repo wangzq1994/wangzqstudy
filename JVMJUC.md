@@ -566,7 +566,7 @@ Java虚拟机栈与程序计数器一样，都是线程私有的部分，生命�
 
 **堆是JVM中内存占用最大的一块区域，它是所有线程共享的一块区域。 堆的作用是为对象分配内存并存储和回收它们。 堆是垃圾回收的主要区域，所以堆区也被成为GC堆。**
 
-堆区可以划分为 **新生代(Young Generation),老年代(Old Generation)** 和 永久代(Permanent Generation),但永久代已被元空间代替, **元空间存储的是类的元信息，几乎不可能发生GC。**
+堆区可以划分为 **新生代(Young Generation),老年代(Old Generation)** 和 永久代(Permanent Generation),但永久代已被元空间代替, **元空间存储的是类的元信息，几乎不可能发生GC。** 
 
 新生代再细分可以分为: **Eden空间，From Survivor空间(from区)和To Survivor空间(TO区)。**
 
