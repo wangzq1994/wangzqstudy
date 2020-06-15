@@ -538,11 +538,35 @@ native 标注的方法 是调用第三方的函数库 或者 底层操作系统�
 
 ![image-20200613210018492](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200613210018492.png)
 
+##### 永久带(元空间)
+
+![image-20200615211446650](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200615211446650.png)
+
+![image-20200615211813266](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200615211813266.png)
+
+![image-20200615211917053](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200615211917053.png)
+
+**字符串常量池在jdk7已经从永久代转移到了堆内存之中。**
+
+**无论是永久代还是元空间，都有可能发生OOM。**
+
+
+
+
+
+
+
+
+
 ##### Java栈
 
 栈管运行,堆管存储
 
 ![image-20200614213534929](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200614213534929.png)
+
+###### StackOverflowError
+
+当前线程执行或请求的栈的大小超过了Java 虚拟机栈的最大空间(比如递归嵌套调用太深),就可能出现StackOverflowError错误
 
 **Java方法 ====栈帧**    
 
@@ -573,6 +597,56 @@ Java虚拟机栈与程序计数器一样，都是线程私有的部分，生命�
 ![image-20200614220540962](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200614220540962.png)
 
 ![image-20200614220911672](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200614220911672.png)
+
+##### 堆参数调节
+
+![image-20200615212854971](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200615212854971.png)
+
+![image-20200615213025889](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200615213025889.png)
+
+- -Xms
+
+> 设置堆内存初始化大小。
+
+- -Xmx / -XX:MaxHeapSize=?
+
+> 设置堆内存最大值。
+
+![image-20200615213511260](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200615213511260.png)
+
+![image-20200615213622227](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200615213622227.png)
+
+###### OutOfMemoryError
+
+发生OOM的情况:
+
+- java heap space
+
+> 当需要为对象分配内存时，堆空间占用已经达到最大值， 无法继续为对象分配内存，可能会出现OOM: java heap space错误。
+
+- Requested array size exceeds VM limit
+
+> 当为数组分配内存时，数组需要的容量超过了虚拟机的限制范围， 就会抛出OOM: Requested array size exceeds VM limit。 根据我的测试，Integer.MAX_VALUE - 2 是虚拟机能为数组分配的最大容量
+
+- GC overhead limit exceed
+
+> 垃圾回收器花费了很长时间GC,但是GC回收的内存非常少, 就可能抛出OOM:GC overhead limit exceed 错误。
+>
+> 但是这点在我的机器上测试不出来,可能与jdk版本或gc收集器或Xmx分配内存的大小有关, 一直抛出的是java heap space
+
+- Direct buffer memory
+
+> 当程序分配了超额的本地物理内存(native memory/ direct buffer)， minor gc(young gc)并不会回收这部分内存， 只有 full gc才会回收直接内存，如果不发生full gc， 但直接内存却被使用完了，那么可能会发生 OOM: Direct buffer memory。
+
+- unable to create new native thread
+
+> 操作系统的线程资源是有限的， 如果程序创建的线程资源太多(无需超过平台限制的线程资源上限)， 就可能发生 OOM: unable to create new native thread 错误。
+
+- Metaspace
+
+> 当加载到元空间中的类的信息太多，就有可能导致 OOM : Metaspace。 **使用cglib的库，可以动态生成class，所以可以使用cglib测试此错误。**
+
+
 
 #### 进程和线程
 
