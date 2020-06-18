@@ -845,7 +845,7 @@ Java虚拟机栈与程序计数器一样，都是线程私有的部分，生命�
 
 ![image-20200617155837093](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200617155837093.png)
 
-##### JMM(java内存模型)
+#### JMM(java内存模型)
 
 ![image-20200617161306167](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200617161306167.png)
 
