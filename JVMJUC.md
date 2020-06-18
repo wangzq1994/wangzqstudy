@@ -857,7 +857,7 @@ Java虚拟机栈与程序计数器一样，都是线程私有的部分，生命�
 
 #### Volatile
 
-volatile是java虚拟机提供的一种轻量级同步机制
+**volatile是java虚拟机提供的一种轻量级同步机制**
 
 1. 保证可见性
 2. **不保证原子性**
@@ -1000,5 +1000,138 @@ public static void main(String[] args) {
   // main线程: num=13808
   // main线程: num2=20001
 }
+```
+
+#### volatile禁止指令重排序
+
+1. Java内存模型中，为提高性能，允许编译器和处理器对指令进行重排序。
+2. 重排时会考虑到指令间的数据依赖性
+3. 不会影响单线程环境下程序执行
+4. 多线程环境下由于线程交替执行，由于编译器优化重排的存在，两线程使用的变量能否保证一致性是无法确定的。结果无法预测。
+
+![image-20200618181825699](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200618181825699.png)
+
+####  指令重排造成的不安全举例
+
+```java
+int a=0;
+boolean flag = false;
+
+public void m1(){
+  a=1; // 1
+  flag=true; // 2
+}
+
+public void m2() {
+  if(flag){
+    a = a+5; // 3
+    System.out.println("revalue="+a);
+  }
+}
+```
+
+解释：
+
+1. 线程1执行m1，线程2执行m2
+
+2. 在不重排时，一定是按照123步骤执行，结果为6
+
+3. 如果发生重排，比如1和2交换了顺序，当m1执行完2时，线程切换，执行m1，这时可以进入if函数，a结果为5
+
+   
+
+#### 禁止指令重拍小总结(了解即可)
+
+![image-20200618184728705](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200618184728705.png)
+
+![image-20200618184905783](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200618184905783.png)
+
+#### 如何保证有序性？
+
+保证有序性：volatile、synchronized、Lock
+
+#### (面试题)你在哪些地方用到了volatile?
+
+1. 单例模式在多线程下不安全
+2. 读写锁/手写缓存
+3. cas底层源码分析
+
+#### 单例模式在多线程下不安全代码演示
+
+```java
+public class SingletonDemo {
+
+  private static SingletonDemo instance = null;
+
+  private SingletonDemo() {
+    System.out.println(Thread.currentThread().getName()+"\t调用构造方法");
+  }
+
+  public static SingletonDemo getInstance() {
+    if(instance == null){
+      instance = new SingletonDemo();
+    }
+
+    return instance;
+  }
+  public static void main(String[] args) {
+    // 单线程下，单例模式正常。
+//    System.out.println(SingletonDemo.getInstance() == SingletonDemo.getInstance());
+//    System.out.println(SingletonDemo.getInstance() == SingletonDemo.getInstance());
+//    System.out.println(SingletonDemo.getInstance() == SingletonDemo.getInstance());
+    //main 调用构造方法
+    //true
+    //true
+    //true
+
+
+    // 多线程下，单例模式不行
+    for (int i = 0; i < 10; i++) {
+      new Thread(()->{
+        SingletonDemo.getInstance();
+      },"线程"+i).start();
+    }
+    //线程0 调用构造方法
+    //线程4 调用构造方法
+    //线程3 调用构造方法
+    //线程2 调用构造方法
+    //线程1 调用构造方法
+  }
+}
+```
+
+#### ! 单例模式在多线程下不安全解决方案？
+
+DCL(double check Lock)双端检索机制+volatile
+
+双端检索机制：在加锁前和加锁后都进行一次判断
+
+demo:
+
+```java
+public static SingletonDemo getInstance() {
+  if(instance == null){
+    synchronized (SingletonDemo.class){
+      if(instance == null){
+        instance = new SingletonDemo();
+      }
+    }
+  }
+  return instance;
+}
+
+```
+
+![image-20200618191957982](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200618191957982.png)
+
+![image-20200618192126724](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200618192126724.png)
+
+因此多线程下，当线程a访问instance!=null时，instance实例却未必初始化完成（还没做2）；此时切到线程b，线程b直接取intance实例，这个实例是未完成初始化的实例。因此线程不安全。
+
+###### 如何解决？
+
+```java
+private static volatile SingletonDemo instance = null;
+// 告诉编译器禁止指令重排
 ```
 
