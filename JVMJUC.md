@@ -1135,3 +1135,152 @@ private static volatile SingletonDemo instance = null;
 // 告诉编译器禁止指令重排
 ```
 
+#### CAS
+
+CAS是什么:  比较并交换（compareAndSet）
+
+![image-20200619102525572](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200619102525572.png)
+
+提问线路：CAS—> Unsafe—> CAS底层原理 —> 原子引用更新 —> 如何规避ABA问题
+
+```java
+/**
+ * boolean compareAndSet(int expect, int update)
+ * - 如果主内存的值=期待值expect，就将主内存值改为update
+ * - 该方法可以检测线程a的操作变量X没有被其他线程修改过
+ * - 保证了线程安全
+ */
+public static void main(String[] args) {
+    AtomicInteger atomicInteger = new AtomicInteger(5);
+    System.out.println(atomicInteger.compareAndSet(5, 10)+ "\t" + atomicInteger);
+    System.out.println(atomicInteger.compareAndSet(5, 20)+ "\t" + atomicInteger);
+    //true	10
+    //false	10
+}
+```
+
+#### CAS底层原理简述？
+
+一  首先是 Unsafe 类
+
+1. 该类所有方法都是native修饰，直接调用底层资源。sun.misc包中。
+2. 可以像C的指针一样直接操作内存。java的CAS操作依赖Unsafe类的方法。
+
+二 自旋锁
+
+1. 自旋：比较并交换，直到比较成功
+
+CAS靠的是底层的Unsafe 类保证原子性
+
+![image-20200619102220908](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200619102220908.png)
+
+#### atomicInteger.getAndIncrement() 详解
+
+![image-20200619102943756](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200619102943756.png)
+
+简述：
+
+1. **调用了Unsafe类的getAndAddInt**
+2. getAndAddInt使用cas一直循环尝试修改主内存
+
+#### 总结
+
+![image-20200619103156133](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200619103156133.png)
+
+#### CAS有哪些缺点？
+
+1. 循环时间长，开销大
+   1. 如果cas失败，就一直do while尝试。如果长时间不成功，可能给CPU带来很大开销。
+2. 只能保证一个共享变量的原子操作
+   1. 如果时多个共享变量，cas无法保证原子性，只能加锁，锁住代码段。
+3. 引出来ABA问题。
+
+#### 原子类AtomicInteger的ABA问题谈谈?原子更新引用知道吗?
+
+#### ABA问题
+
+ABA问题描述: 比如从内存位置V中取出A，此时线程2也取出A。且线程2做了一次cas将值改为了B，然后又做了一次cas将值改回了A。此时线程1做cas发现内存中还是A，则线程1操作成功。这个时候实际上A值已经被其他线程改变过，这与设计思想是不符合的
+
+#### 这个过程问题出在哪？
+
+- 如果只在乎结果，ABA不介意B的存在，没什么问题
+- 如果B的存在会造成影响，需要通过AtomicStampReference，加时间戳解决。
+
+#### 原子更新引用是啥？
+
+**AtomicStampReference**，使用带时间戳的原子类，解决cas中出现的ABA问题。
+
+#### AtomicReference使用代码演示(原子类包装)
+
+我们有atomicInteger atomicDouble  atomicboolearn  可不可有我们字的atomic***
+
+是可以有的  AtomicReference 这类有泛型丢进去什么 就是atomic***
+
+```java
+public static void main(String[] args) {
+    User z3 = new User("z3",18);
+    User l4 = new User("l4",19);
+    AtomicReference<User> atomicReference = new AtomicReference<>(z3);
+    System.out.println(atomicReference.compareAndSet(z3, l4) + "\t" + atomicReference.get().toString());//ture 交换成功
+    System.out.println(atomicReference.compareAndSet(z3, l4) + "\t" + atomicReference.get().toString());//false 交换失败
+}
+```
+
+#### AtomicReference存在ABA问题代码验证
+
+```java
+public static void main(String[] args) {
+    ABADemo abaDemo = new ABADemo();
+
+    new Thread(()->{
+        abaDemo.atomicReference.compareAndSet(100,101);
+        abaDemo.atomicReference.compareAndSet(101,100);
+    },"1").start();
+
+    new Thread(()->{
+        // 睡1s等线程1执行完ABA
+        try {TimeUnit.SECONDS.sleep(1);} catch (InterruptedException e) { e.printStackTrace();}
+        System.out.println(abaDemo.atomicReference.compareAndSet(100, 2020)+"\t"+abaDemo.atomicReference.get());
+        //true  2020
+
+    },"2").start();
+}
+```
+
+#### AtomicStampReference解决ABA问题代码验证
+
+解决思路：每次变量更新的时候，把变量的版本号加一，这样只要变量被某一个线程修改过，该变量版本号就会发生递增操作，从而解决了ABA变化
+
+```java
+AtomicStampedReference atomicStampedReference = new AtomicStampedReference<Integer>(100,1);
+
+public static void main(String[] args) {
+    // ABAProblem();
+    ABADemo abaDemo = new ABADemo();
+
+    new Thread(()->{
+        // 等线程2读到初始版本号的值
+        try {TimeUnit.SECONDS.sleep(1);} catch (InterruptedException e) { e.printStackTrace();}
+        System.out.println("线程1在ABA前的版本号："+abaDemo.atomicStampedReference.getStamp());
+        abaDemo.atomicStampedReference.compareAndSet(100,101,abaDemo.atomicStampedReference.getStamp(),abaDemo.atomicStampedReference.getStamp()+1);
+        abaDemo.atomicStampedReference.compareAndSet(101,100,abaDemo.atomicStampedReference.getStamp(),abaDemo.atomicStampedReference.getStamp()+1);
+        System.out.println("线程1在ABA后的版本号："+abaDemo.atomicStampedReference.getStamp());
+    },"1").start();
+
+    new Thread(()->{
+        // 存一下修改前的版本号
+        int stamp = abaDemo.atomicStampedReference.getStamp();
+        System.out.println("线程2在修改操作前的版本号："+stamp);
+        // 睡1s等线程1执行完ABA
+        try {TimeUnit.SECONDS.sleep(2);} catch (InterruptedException e) { e.printStackTrace();}
+        System.out.println(abaDemo.atomicStampedReference.compareAndSet(100,2020,stamp,abaDemo.atomicStampedReference.getStamp()+1)+ "\t" + abaDemo.atomicStampedReference.getReference());
+        //线程2在修改操作前的版本号：1
+        //线程1在ABA前的版本号：1
+        //线程1在ABA后的版本号：3
+        //false 100
+
+        },"2").start();
+
+}
+```
+
