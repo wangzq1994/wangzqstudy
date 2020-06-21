@@ -1391,6 +1391,8 @@ HashMap > Collections.synchronizedMap() > **ConcurrentHashMap**(这个名字不�
 
 ### HashMap的特点
 
+https://www.cnblogs.com/ylspace/p/12726388.html
+
 - HashMap在Jdk8之前使用拉链法实现,jdk8之后使用拉链法+红黑树实现。
 - HashMap是线程不安全的,并允许null key 和 null value。**
 - HashMap在我当前的jdk版本(11)的默认容量为0,在第一次添加元素的时候才初始化容量为 16, 之后才扩容为原来的2倍。
@@ -1492,7 +1494,9 @@ HashMap计算添加元素的位置时，使用的位运算，这是特别高效�
 
 ### ! ConcurrentHashMap底层原理-jdk8
 
-.8版本的ConcurrentHashMap的实现与1.7版本有很大的差别，放弃了段锁的概念，借鉴了HashMap的数据结构：数组＋链表＋红黑树。
+https://www.cnblogs.com/ylspace/p/12726672.html
+
+1.8版本的ConcurrentHashMap的实现与1.7版本有很大的差别，放弃了段锁的概念，借鉴了HashMap的数据结构：数组＋链表＋红黑树。
 
 ConcurrentHashMap不接受nullkey和nullvalue。
 
@@ -1595,3 +1599,446 @@ volatile Node<K,V>[] table;
 - HashMap和ConcurrentHashMap对比
 - HashMap和HashTable的对比
 - HashTable和ConcurrentHashMap对比
+
+# Java锁
+
+### Java 15锁，列举一些？
+
+1.公平锁 / 非公平锁
+2.可重入锁 / 不可重入锁
+3.独享锁 / 共享锁
+4.互斥锁 / 读写锁
+5.乐观锁 / 悲观锁
+6.分段锁
+7.偏向锁 / 轻量级锁 / 重量级锁
+8.自旋锁
+
+### 公平和非公平锁是什么？两者区别（优缺点）？两种锁举例？
+
+**是什么？**
+
+​	公平锁：多个线程按照申请锁的顺序来获取锁。
+​	非公平锁：多个线程获取锁的顺序不是按照申请舒顺序来的，有可能后申请的线程比先申请的线程优先获取      						锁。高并发下，有可能造成优先级反转或者饥饿现象。
+**区别：**
+
+​	公平锁：保证顺序（队列，FIFO），性能下降。
+​	非公平：先尝试直接占有锁，如果尝试失败，再采用类似公平锁的方式。优点在于吞吐量比公平锁大。
+**举例**
+
+ReentrantLock可以指定创建公平锁或非公平锁，无参构造默认创建非公平锁。
+synchronized是非公平的。
+
+# 可重入锁是什么？与不可重入的区别？可重入锁举例？作用？实现原理？
+
+是什么？
+
+- 也叫递归锁
+- 当一个线程获取某个对象锁后，可以再次获取同一把对象锁。
+- 即，**线程可进入任何他所拥有的锁  所同步着的代码块。**
+
+```java
+public synchronized  void m1(){
+      m1();//进入任何他所拥有的锁  所同步着的代码块
+      m2();//进入任何他所拥有的锁  所同步着的代码块
+}
+public synchronized  void m2(){
+     
+}
+
+```
+
+​			可重入锁：某线程进入外层m1后，可以再次进入递归m1方法。也叫递归锁。
+​			不可重入锁：某线程进入外部m1后，不可再进如内部m1，必须等待锁释放。这里就造成了死锁。
+**举例：**
+
+​		ReentrantLock/synchronized就是典型的可重入锁
+**作用：**
+
+​		避免死锁。案例：递归
+
+**实现原理：**
+
+​		计数器：进入最外层计数器=1，每递归一次，计数器+1，每退出一层，计数器-1，直到计数器=0，说明退出		了最外层，此时该线程释放锁对象，其他线程才能获取该锁。 
+
+### 可重入锁代码验证 
+
+#### synchronized
+
+```java
+public class SynchronizedLockDemo {
+
+    public synchronized void m1(){
+        System.out.println(Thread.currentThread().getName() + "----m1----");
+        m2();
+    }
+
+    public synchronized void m2(){
+        System.out.println(Thread.currentThread().getName() + "----m2----");
+    }
+
+    /**
+     * 可以看出，m1,m2是同一把锁，只有线程释放最外层锁，其他线程才能占用该锁。
+     * @param args
+     */
+    public static void main(String[] args) {
+        SynchronizedLockDemo rd = new SynchronizedLockDemo();
+        for (int i = 0; i < 5; i++) {
+            new Thread(()->{
+                rd.m1();
+            },String.valueOf(i)).start();
+        }
+    }
+     	//0----m1----
+        //0----m2----
+        //2----m1----
+        //2----m2----
+```
+
+#### ReentrantLock
+
+```java
+public class ReentrantLockDemo {
+
+    Lock lock = new ReentrantLock();
+
+    public void m1(){
+        lock.lock();
+//        lock.lock();
+        try {
+
+            System.out.println(Thread.currentThread().getName() + "----m1----");
+            m2();
+
+        }finally {
+            lock.unlock();
+//            lock.unlock();
+        }
+    }
+
+    public void m2(){
+        lock.lock();
+        try {
+
+            System.out.println(Thread.currentThread().getName() + "----m2----");
+
+        }finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * 锁要成对出现，否则：
+     *  - 多一个lock.lock()会造成锁无法释放,程序卡住
+     *  - 多一个lock.unlock()直接报错
+     */
+    public static void main(String[] args) {
+        ReentrantLockDemo rd = new ReentrantLockDemo();
+        for (int i = 0; i < 5; i++) {
+            new Thread(()->{
+                rd.m1();
+            },String.valueOf(i)).start();
+        }
+        //0----m1----
+        //0----m2----
+        //2----m1----
+        //2----m2----
+
+```
+
+# 自旋锁是什么？优点？缺点？
+
+- 自旋锁（spinlock）是指尝试获取锁的对象不会立即阻塞，而是采用循环的方式取尝试获取锁。好处是减少线程上下文切换的消耗，缺点是循环会消耗CPU
+
+## 手写一个自旋锁
+
+```java
+public class SpinLockDemo {
+
+    /**
+     * 手写自旋锁
+     * 自旋锁的核心：while+cas+原子引用线程
+     *
+     * A线程加锁，一顿操作5秒钟，解锁。B线程一直自旋等待A线程释放锁，然后获取锁。
+     * 打印结果：
+     * A尝试获取锁
+     * A成功获取锁
+     * A一顿操作5秒...
+     * B尝试获取锁
+     * A释放锁
+     * B成功获取锁
+     * B一顿操作
+     * B释放锁
+     */
+    public static void main(String[] args) {
+        SpinLockDemo sDemo = new SpinLockDemo();
+
+        new Thread(()->{
+            sDemo.myLock();
+
+            System.out.println(Thread.currentThread().getName()+"一顿操作5秒...");
+            try {TimeUnit.SECONDS.sleep(5);} catch (InterruptedException e) {e.printStackTrace();}
+
+            sDemo.myUnLock();
+
+        },"A").start();
+
+        // 保证线程A先上的锁
+        try {TimeUnit.SECONDS.sleep(1);} catch (InterruptedException e) {e.printStackTrace();}
+
+        new Thread(()->{
+            sDemo.myLock();
+
+            System.out.println(Thread.currentThread().getName()+"一顿操作");
+
+            sDemo.myUnLock();
+
+        },"B").start();
+
+    }
+
+    AtomicReference atomicThreadRef = new AtomicReference<Thread>();
+    // 加锁
+    public void myLock(){
+        // 线程A进来，发现是null值，成功操作cas把自己放进去
+        // 线程B进来，发现不是null值，一直自旋等待线程A释放锁
+        System.out.println(Thread.currentThread().getName()+"尝试获取锁");
+        while (!atomicThreadRef.compareAndSet(null,Thread.currentThread())){
+
+        }
+        System.out.println(Thread.currentThread().getName()+"成功获取锁");
+    }
+
+    // 释放锁
+    public void myUnLock(){
+        // 线程A发现原子引用是自己，于是cas成功修改为null值，即释放锁
+        atomicThreadRef.compareAndSet(Thread.currentThread(),null);
+        System.out.println(Thread.currentThread().getName()+"释放锁");
+    }
+}
+```
+
+# (读写锁)独占锁和共享锁是什么？举例？优缺点比较？
+
+### 是什么？
+
+​		独占锁：写锁，该锁只能被一个线程所持有。
+​		共享锁：读锁，该锁可被多个线程所持有。
+**举例**
+
+​		ReentrantLock和sychronized都是独占锁。
+​		ReentrantReadWriteLock，其读锁是共享锁，写锁是独占锁。
+**优缺：**
+
+​		共享锁保证并发读是非常高效的；读写、写读、写写过程是互斥的。
+
+**写操作: 原子加独占,整个过程必须是一个完整的统一体,中间不允许被分割,被打断**
+
+### 验证读写锁ReentrantReadWriteLock
+
+并发读写不安全演示
+
+```java
+public class ReadWriteUnsafeDemo {
+
+    Map<Integer,String> map = new HashMap<>();
+
+    public void myPut(Integer key, String value){
+        System.out.println(Thread.currentThread().getName() + "\t" + "正在写入："+key);
+        map.put(key ,value);
+        System.out.println(Thread.currentThread().getName() + "\t" + "写入完成："+key);
+    }
+
+    public void myGet(Integer key){
+        System.out.println(Thread.currentThread().getName() + "\t" + "正在读取："+key);
+        String value = map.get(key);
+        System.out.println(Thread.currentThread().getName() + "\t" + "读取完成："+key+","+value);
+    }
+
+    /**
+     * 并发读写不安全演示
+     * 打印：
+     * 0	正在写入：0
+     * 2	正在写入：2
+     * 4	正在写入：4
+     * 3	正在写入：3
+     * 1	正在写入：1
+     * 3	写入完成：3
+     * 0	正在读取：0
+     * 4	写入完成：4
+     * 0	读取完成：0,0
+     * 2	写入完成：2
+     * 0	写入完成：0
+     * ...
+     * 结论：写入不是原子操作，线程不安全
+     *
+     * 只锁put不锁get会发生什么？
+     * 2	正在写入
+     * 0	正在读取
+     * 2	写入完成：2
+     * 造成写时读，不安全。没有保证写的原子性。
+     */
+    public static void main(String[] args) {
+        ReadWriteUnsafeDemo demo = new ReadWriteUnsafeDemo();
+        for(int i=0; i<5; ++i){
+            final int tmp = i;
+            new Thread(()->{
+                demo.myPut(tmp,String.valueOf(tmp));
+            },String.valueOf(i)).start();
+        }
+
+        for(int i=0; i<5; ++i){
+            final int tmp = i;
+            new Thread(()->{
+                demo.myGet(tmp);
+            },String.valueOf(i)).start();
+        }
+    }
+}
+```
+
+验证读写锁ReentrantReadWriteLock
+
+```java
+public class ReadWriteLockDemo {
+
+    // 缓存资源都加一下volatile，保证线程间可见
+    volatile Map<Integer,String> map = new HashMap<>();
+    ReadWriteLock rwLock = new ReentrantReadWriteLock();
+
+    public void myPut(Integer key, String value){
+
+        rwLock.writeLock().lock();
+        try{
+            System.out.println(Thread.currentThread().getName() + "\t" + "正在写入");
+            map.put(key ,value);
+            System.out.println(Thread.currentThread().getName() + "\t" + "写入完成："+key);
+        }catch (Exception e){
+            e.printStackTrace();
+        }finally {
+            rwLock.writeLock().unlock();
+        }
+    }
+
+    public void myGet(Integer key){
+
+        rwLock.readLock().lock();
+        try{
+            System.out.println(Thread.currentThread().getName() + "\t" + "正在读取");
+            String value = map.get(key);
+            System.out.println(Thread.currentThread().getName() + "\t" + "读取完成："+value);
+        }catch (Exception e){
+            e.printStackTrace();
+        }finally {
+            rwLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * 要求：
+     * - 读可并发
+     * - 写和任何操作互斥
+     * 核心：ReentrantReadWriteLock + volatile
+     * 打印：
+     * 2	正在写入
+     * 2	写入完成：2
+     * 3	正在写入
+     * 3	写入完成：3
+     * 4	正在写入
+     * 4	写入完成：4
+     * 4	正在读取
+     * 2	正在读取
+     * 1	正在读取
+     * 1	读取完成：1
+     * 3	正在读取
+     * 结论：读写锁保证了写原子性，读并发
+     */
+    public static void main(String[] args) {
+        ReadWriteLockDemo demo = new ReadWriteLockDemo();
+        for(int i=0; i<5; ++i){
+            final int tmp = i;
+            new Thread(()->{
+                demo.myPut(tmp,String.valueOf(tmp));
+            },String.valueOf(i)).start();
+        }
+
+        for(int i=0; i<5; ++i){
+            final int tmp = i;
+            new Thread(()->{
+                demo.myGet(tmp);
+            },String.valueOf(i)).start();
+        }
+    }
+}
+```
+
+# 什么是乐观锁/悲观锁？举例？
+
+**悲观锁**
+
+总是假设最坏的情况，每次去拿数据的时候都认为别人会修改，所以每次在拿数据的时候都会上锁，Java中synchronized和ReentrantLock等**独占锁就是悲观锁思想的实现。**
+
+**乐观锁**
+
+总是假设最好的情况，每次去拿数据的时候都认为别人不会修改，所以不会上锁，采用版本号+cas的方式去保证线程安全。乐观锁适用于多读写少的应用类型，这样可以提高吞吐量。atomic包的类就是基于cas实现乐观锁的。
+
+**什么是乐观读/悲观读？**
+
+**悲观读**：在没有任何读写锁的时候才能取得写入的锁，可用于实现悲观读取（读优先，没有读时才能写），读多写少的场景下可能会出现线程饥饿。
+
+**乐观读**：如果读多写少，就乐观的认为读写同时发生的情况少，因此不采用完全锁定的方式，而是采用cas实现乐观锁。
+
+## ReentrantReadWriteLock是乐观读还是悲观读？
+
+悲观读
+
+## ! StempedLock作用？
+
+它控制锁有三种模式（写、悲观读、乐观读）。
+
+核心代码：
+
+```java
+private final StampedLock sl = new StampedLock();
+long stamp = sl.tryOptimisticRead(); // 获得一个乐观读锁
+// stamp=0表示没有写锁入侵，
+long stamp = sl.readLock(); // 获取悲观读锁
+long stamp = lock.writeLock();// 获得写锁
+```
+
+ReentrantReadWriteLock是悲观读，读优先，而StempedLock可以指定。
+
+## synchronized和Lock的区别是什么？
+
+1.原始构成
+	synchronized是关键字，属于JVM层面（底层通过monitor对象完成，monitorenter\monitorexit）
+	Lock是juc里具体的类，是API层面
+2.使用方法
+	synchronized不需要手动释放锁，代码块执行完就自动释放了
+	ReentrantLock必须手动释放锁，否则可能导致死锁
+3.等待是否可中断
+	synchronized不可中断，除非抛异常或正常执行完毕
+	ReentrantLock可中断
+	1 lock.tryLock(long timeout, TimeUnit unit)
+	2 lock.lockInterruptibly() 直接中断锁
+4.加锁是否公平
+	synchronized非公平
+	ReentrantLock可以指定，默认非公平。
+5.锁能否绑定多个条件（Condition）
+	synchronized没有，要么随机唤醒一个，要么唤醒全部
+	ReentrantLock实现分组唤醒，可精确唤醒。（详见AQS的Condition小节）
+	Condition condition_pro = lock.newCondition();
+	Condition condition_con = lock.newCondition();
+
+# AQS
+
+**什么是AQS?**
+
+- ​    AbstractQueuedSynchronizer类 - AQS
+- ​	是juc实现锁或其他同步工具的基础框架，数据结构是队列
+
+- ​	基于AQS的同步组件：CountDownLatch、Semaphore、CyclicBarrier、ReentrantLock、Condition
+  
+
+## CountDownLatch -简述？应用场景？应用案例？常用方法？
+
+计数器
