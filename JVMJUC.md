@@ -1618,7 +1618,7 @@ volatile Node<K,V>[] table;
 **是什么？**
 
 ​	公平锁：多个线程按照申请锁的顺序来获取锁。
-​	非公平锁：多个线程获取锁的顺序不是按照申请舒顺序来的，有可能后申请的线程比先申请的线程优先获取      						锁。高并发下，有可能造成优先级反转或者饥饿现象。
+​	非公平锁：多个线程获取锁的顺序不是按照申请舒顺序来的，有可能后申请的线程比先申请的线程优先获取锁。高并发下，有可能造成优先级反转或者饥饿现象。
 **区别：**
 
 ​	公平锁：保证顺序（队列，FIFO），性能下降。
@@ -2041,4 +2041,202 @@ ReentrantReadWriteLock是悲观读，读优先，而StempedLock可以指定。
 
 ## CountDownLatch -简述？应用场景？应用案例？常用方法？
 
-计数器
+(倒计时 )计数器  **阻塞某线程直到前面所有线程执行完才被唤醒。**
+
+```java
+public class CountDownLatchDemo {
+
+    CountDownLatch countDownLatch = new CountDownLatch(6);
+
+    /**
+     * 一个需求：某线程要在前面线程都执行完任务后才能执行。
+     * CountLatch应用场景：阻塞某线程直到前面所有线程执行完才被唤醒。
+     * demo.countDownLatch.await();
+     *      等待前面线程执行完
+     * countDownLatch.await(10, TimeUnit.MILLISECONDS);
+     *      只等待指定时间，超过就不继续等待。
+     * 打印：
+     * 0	执行任务
+     * 4	执行任务
+     * 3	执行任务
+     * 2	执行任务
+     * 1	执行任务
+     * 5	执行任务
+     * main	最后执行执行任务
+     */
+    public static void main(String[] args) throws InterruptedException {
+
+        CountDownLatchDemo demo = new CountDownLatchDemo();
+
+        for(int i=0; i<6; ++i){
+            new Thread(()->{
+                System.out.println(Thread.currentThread().getName()+"\t"+"执行任务");
+                // 一个线程执行完任务就-1
+                demo.countDownLatch.countDown();
+            },String.valueOf(i)).start();
+        }
+
+        // 阻塞，等待countDownLatch变为0，即所有任务线程执行完。
+        demo.countDownLatch.await();
+        System.out.println(Thread.currentThread().getName()+"\t"+"最后执行执行任务");
+    }
+}
+```
+
+## CyclicBarrier- 简述？应用场景？应用案例？常用方法？
+
+它与CountDownLatch 正好相反
+
+使一组线程到达一个屏障（Barrier）时被阻塞，直到最后一个线程到达屏障时，所有被屏障拦截的线程才能全部被唤醒继续操作。
+
+```java
+组线程到达一个屏障（Barrier）时被阻塞，直到最后一个线程到达屏障时，所有被屏障拦截的线程才能全部被唤醒继续操作。
+ *  - 使用方法：线程调用await(),会进入等待状态，且计数器-1，直到计数器=0时，所有线程被唤醒。
+ *  - 应用场景：5个线程执行完ready任务后都相互等待，直到5个线程的ready任务都执行完毕再执行continue任务。
+ *  - 常用方法：
+ *      barrier.await();
+ *          等待其他线程
+ *      barrier.await(2000, TimeUnit.MILLISECONDS);
+ *          等待指定时间后会抛异常。
+ *      new CyclicBarrier(5, () -> {})
+ *          在ready和continue之间会执行的代码放在此处
+ *  - 计数器重复使用（Cyclic）：cyclicBarrier.reset();
+ *
+ * 打印：
+ * 0	执行ready
+ * 2	执行ready
+ * 3	执行ready
+ * 1	执行ready
+ * 4	执行ready
+ * 集中点，此时所有线程完成ready操作
+ * 4	执行continue
+ * 3	执行continue
+ * 0	执行continue
+ * 1	执行continue
+ * 2	执行continue
+ */
+public class CyclicBarrierDemo {
+
+    CyclicBarrier cyclicBarrier = new CyclicBarrier(5, () -> {
+        System.out.println("集中点，此时所有线程完成ready操作");
+    });
+
+    public static void main(String[] args) {
+        CyclicBarrierDemo demo = new CyclicBarrierDemo();
+
+        for(int i=0; i<5; ++i){
+            new Thread(()->{
+
+                System.out.println(Thread.currentThread().getName()+"\t"+"执行ready");
+                try {
+                    demo.cyclicBarrier.await();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } catch (BrokenBarrierException e) {
+                    e.printStackTrace();
+                }
+                System.out.println(Thread.currentThread().getName()+"\t"+"执行continue");
+            },String.valueOf(i)).start();
+        }
+
+        // 循环使用计数器
+        demo.cyclicBarrier.reset();
+
+        // 下一波操作
+    }
+}
+```
+
+## Semaphore- 简述？应用场景？应用案例？常用方法？
+
+semaphore 是信号灯的意思  线程同步的辅助类，可以维护当前访问自身的线程个数，并提供了同步机制 使用Semaphore可以控制同时访问资源的线程个数，例如，实现一个文件允许的并发访问数。
+
+比如我们某个资源的最大访问资源是10个线程  当达到10个线程时 其他线程会被阻塞  当10个中释放掉一个进来一个 
+
+```java
+/**
+ * Semaphore
+ *  - 使用场景：
+ *      demo1-共享资源互斥（吃海底捞，座位有限，但是可以等待别人吃完，再进去，不用离开）
+ *      demo2-控制并发数（线程池，超过并发数，就抛弃连接）
+ *  demo1-打印：
+ * 0   占到座位
+ * 1   占到座位
+ * 2   占到座位
+ * 0   释放座位
+ * 2   释放座位
+ * 3   占到座位
+ * 4   占到座位
+ * 1   释放座位
+ * 5   占到座位
+ * 3   释放座位
+ * 5   释放座位
+ * 4   释放座位
+ *  demo2-打印：
+ * 0   尝试获取连接
+ * 2   尝试获取连接
+ * 3   尝试获取连接
+ * 1   尝试获取连接
+ * 5   尝试获取连接
+ * 4   尝试获取连接
+ * 5   连接成功
+ * 1   连接成功
+ * 4   连接成功
+ * 3   连接失败
+ * 0   连接失败
+ * 2   连接失败
+ */
+public class SemaphoreDemo {
+
+    public static void main(String[] args) {
+        // demo1
+        haidilao();
+        // demo2
+        xianchengchi();
+    }
+
+    // 线程池：最大连接数为3，超过就抛弃连接。
+    private static void xianchengchi() {
+        Semaphore semaphore = new Semaphore(3);
+        for(int i=0; i<6; ++i){
+            new Thread(()->{
+                try {
+                    System.out.println(Thread.currentThread().getName()+"\t"+"尝试获取连接");
+                    // 只等200毫秒，等不到就抛弃，连接失败
+                    if(semaphore.tryAcquire(200, TimeUnit.MILLISECONDS)){
+                        System.out.println(Thread.currentThread().getName()+"\t"+"连接成功");
+                        TimeUnit.SECONDS.sleep(1);
+                    }else {
+                        System.out.println(Thread.currentThread().getName()+"\t"+"连接失败");
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }finally {
+                    semaphore.release();
+                }
+            },String.valueOf(i)).start();
+        }
+    }
+
+    // 海底捞：3个座位6个人
+    private static void haidilao() {
+        Semaphore semaphore = new Semaphore(3);
+        for(int i=0; i<6; ++i){
+            new Thread(()->{
+                try {
+                    semaphore.acquire();
+                    System.out.println(Thread.currentThread().getName()+"\t"+"占到座位");
+                    // 吃一会儿
+                    TimeUnit.SECONDS.sleep(3);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }finally {
+                    System.out.println(Thread.currentThread().getName()+"\t"+"释放座位");
+                    semaphore.release();
+                }
+            },String.valueOf(i)).start();
+        }
+    }
+}
+```
+
