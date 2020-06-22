@@ -1,4 +1,4 @@
-# JVMJUC学习
+JVMJUC学习
 
 ### 进程和线程
 
@@ -2240,3 +2240,49 @@ public class SemaphoreDemo {
 }
 ```
 
+# 阻塞队列
+
+## 什么是阻塞队列？什么情况会导致阻塞是？主要应用场景？
+
+队列：FILO
+
+以下情况发生阻塞：
+
+- 队满时 入队阻塞
+- 队空时 出队阻塞
+
+应用场景：生产者消费者模式
+
+## 为什么要用阻塞队列？有什么好？
+
+阻塞就是线程挂起，当满足条件后，又被唤醒。
+
+为什么需要BlockingQueue?
+
+- 不再需要关心线程阻塞和唤醒的时机，因为BlockingQueue包办了这个细节
+- 在Juc出现前，程序员必须手动控制这些细节，兼顾效率和线程安全，增大了开发难度。
+
+## BlockingQueue的架构图？有哪些实现类？
+
+实现类：
+
+1. ***ArrayBlockingQueue: 由数组结构组成的有界阻塞队列**
+2. ***LinkedBlockingQueue: 由链表结构组成的有界阻塞队列**（但默认大小为Integer.MAX_VALUE，大小配置可选
+3. PriorityBlockingQueue: 支持优先级排序的无界阻塞队列
+4. DelayQueue: 使用优先级队列实现的延迟无界阻塞队列（内部采用PriorityQueue（排序）与ReentrantLock（锁）实现）
+5. ***SynchronousQueue: 队列只插入一个元素，同步队列 也即 单个元素的队列**
+6. LinkedTransferQueue: 由链表结构组成的无界阻塞队列
+7. LinkedBlockingDeque：由链表结构组成的双向阻塞队列
+   带 * 是重要的，是线程池的底层实现。
+
+## ! BlockingQueue的核心方法？
+
+三套操作：插入、移除、检查。
+
+四套处理：抛异常，返回特殊值，阻塞，超时
+
+一个图表
+
+![image-20200622210505560](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200622210505560.png)
+
+![image-20200622211613494](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200622211613494.png)
