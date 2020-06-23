@@ -392,6 +392,8 @@ public class CallableDemo {
     }
 ```
 
+
+
 这就是一个最基本的使用方法。当然Future还提供了很多其他的方法：
 
 （1）cancel方法用来取消任务，如果取消任务成功则返回true，如果取消任务失败则返回false。
