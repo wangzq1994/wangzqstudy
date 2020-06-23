@@ -299,7 +299,9 @@ public static void main(String[] args) {
 
 #### 多线程的获得方式
 
-##### 1.前两种
+##### 1.前三种
+
+new Thread()//自定义
 
 ![image-20200611163612170](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200611163612170.png)
 
@@ -311,13 +313,84 @@ public static void main(String[] args) {
 
 ![image-20200611163735002](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200611163735002.png)
 
-这个源码我摘自jdk1.8，一共列举了9个构造函数，但是仔细观察就能发现，没有一个构造方法可以传入Callable接口，这也就意味着不能根据之前那简单的方式来创建线程。这时候怎么办呢？那就得换一种思考方式。
+没有一个构造方法可以传入Callable接口，这也就意味着不能根据之前那简单的方式来创建线程。
 
-既然线程能有返回值，不知道是否可以联想到一个函数式接口Future，我们以此为基点进行查询
+不知道是否可以联想到一个函数式接口Future他实现了RunableFuture 而他又实现了Runnable接口(面向接口的编程思想)
 
 ![image-20200611163852642](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200611163852642.png)
 
-![image-20200611163906075](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200611163906075.png)
+### Callable基本使用（demo）(银行对账经常使用对账要有结果)
+
+```java
+class MyThread implements Callable<Integer>{
+
+    @Override
+    public Integer call() throws Exception {
+        System.out.println(Thread.currentThread().getName()+"\t调用call方法");
+        TimeUnit.SECONDS.sleep(1);
+        return 1024;
+    }
+}
+
+/**
+ * Callable的基本使用
+ * 打印：
+ * main    调用
+ * A   调用call方法
+ * call返回：1024
+ */
+public class CallableDemo {
+    public static void main(String[] args) throws ExecutionException, InterruptedException {
+        //FutureTask(Callable<V> callable)
+        //FutureTask<V> implements RunnableFuture<V>
+        FutureTask<Integer> futureTask = new FutureTask<>(new MyThread());
+
+        new Thread(futureTask,"A").start();
+        //一个futureTask被多个线程执行只会被执行一次 而不会执行多次
+        //new Thread(futureTask,"B").start();
+        System.out.println(Thread.currentThread().getName()+"\t调用1");
+
+        // 如果没有计算完成，就不能执行下面代码
+        while (!futureTask.isDone()){
+
+        }
+
+        // get方法建议放在最后调用：因为
+        // get方法会要求返回Callable计算结果，如果没有完成，会导致其他线程阻塞，直到计算出结果返回。
+        Integer result = futureTask.get();
+        System.out.println("call返回："+result);
+
+        System.out.println(Thread.currentThread().getName()+"\t调用2");
+
+    }
+}
+```
+
+**1.FutureTask任务多线程并发访问时为啥只会被执行一次？**
+
+```java
+ public void run() {
+    //如果state==new 说明任务没有被执行或者正在被执行还没有执行到set(result)方法。
+    //此时通过CAS操作将runner设置为当前线程，这样如果线程正在执行(此时state仍然为   	new)其他线程进来后CAS设置失败（因为期望值已经不再是null），直接return。这就是为啥FutureTask只会执行一次。
+        if (state != NEW ||
+            !UNSAFE.compareAndSwapObject(this, runnerOffset,
+                                         null, Thread.currentThread()))
+            return;
+        try {
+            Callable<V> c = callable;
+```
+
+**2.FutureTask 的get方法如何实现阻塞的？**
+
+```java
+ public V get() throws InterruptedException, ExecutionException {
+        int s = state;
+        //首先判断state状态，没有完成就会进入awaitDone方法。
+        if (s <= COMPLETING)
+            s = awaitDone(false, 0L);
+        return report(s);
+    }
+```
 
 这就是一个最基本的使用方法。当然Future还提供了很多其他的方法：
 
@@ -343,7 +416,7 @@ public static void main(String[] args) {
 
 ![image-20200611164348858](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200611164348858.png)
 
-##### Callable和Runnable的区别
+### Callable和Runnable的区别
 
 相同点：
 
@@ -353,13 +426,10 @@ public static void main(String[] args) {
 
 不同点：
 
-1、如上面代码所示，callable的核心是call方法，允许返回值，runnable的核心是run方法，没有返回值
-
-2、call方法可以抛出异常，但是run方法不行
-
-3、因为runnable是java1.1就有了，所以他不存在返回值，后期在java1.5进行了优化，就出现了callable，就有了返回值和抛异常
-
-4、callable和runnable都可以应用于executors。而thread类只支持runnable
+1. Callabla有返回值
+2. Callable会抛异常
+3. Callable是call()方法
+4. callable和runnable都可以应用于executors。而thread类只支持runnable
 
 测试：使用线程池来运行
 
@@ -386,7 +456,7 @@ public static void main(String[] args) throws Exception{
 	}
 ```
 
-#### java线程池
+# java线程池
 
 ##### 1、线程池的优势
 
@@ -2240,6 +2310,139 @@ public class SemaphoreDemo {
 }
 ```
 
+## Condition是什么？核心方法？使用案例？
+
+Condition：多线程间协调通信的工具类
+核心：
+
+```java
+Condition condition = reentrantLock.newCondition();
+condition.await();
+condition.signalAll();
+```
+
+## Condition分组唤醒是什么？锁绑定多个Condition使用案例？
+
+核心代码：
+
+```java
+// 生产者组
+Condition condition_pro = lock.newCondition();
+// 消费者组
+Condition condition_con = lock.newCondition();
+// 阻塞当前生产者线程
+condition_pro.await();
+// 唤醒所有生产者
+condition_pro.signalAll();
+// 阻塞当前消费者线程
+condition_con.await();
+// 唤醒所有消费者
+condition_con.signalAll();
+```
+
+锁绑定多个Condition使用案例：
+
+```java
+/**
+ * 锁绑定多个条件（Condition） 案例
+ * 要求：A打印3次，通知B打印4次，通知C打印5次；循环5轮；
+ *
+ * 线程   操作  资源类
+ * 判断   干活  通知
+ * 防止假唤醒while
+ */
+public class MultiConditionDemo {
+
+    public static void main(String[] args) {
+        Resources rs = new Resources();
+        new Thread(()->{
+            for (int i = 0; i < 5; i++) {
+                rs.pa3();
+            }
+        },"A").start();
+
+        new Thread(()->{
+            for (int i = 0; i < 5; i++) {
+                rs.pb4();
+            }
+        },"B").start();
+
+        new Thread(()->{
+            for (int i = 0; i < 5; i++) {
+                rs.pc5();
+            }
+        },"C").start();
+    }
+}
+
+class Resources{
+    Lock lock = new ReentrantLock();
+    String thread = "A";    // 当前线程
+    Condition cA = lock.newCondition();
+    Condition cB = lock.newCondition();
+    Condition cC = lock.newCondition();
+
+    public void pa3(){
+        lock.lock();
+        try{
+            while(!thread.equals("A")){
+                cA.await();
+            }
+            for (int i = 0; i < 3; i++) {
+                System.out.println("A打印");
+            }
+            // A做完了通知B
+            thread="B";
+            cB.signal();
+        }catch (Exception e){
+            e.printStackTrace();
+        }finally {
+            lock.unlock();
+        }
+    }
+
+    public void pb4(){
+        lock.lock();
+        try{
+            while(!thread.equals("B")){
+                cB.await();
+            }
+            for (int i = 0; i < 4; i++) {
+                System.out.println("B打印");
+            }
+            // B做完了通知C
+            thread="C";
+            cC.signal();
+        }catch (Exception e){
+            e.printStackTrace();
+        }finally {
+            lock.unlock();
+        }
+    }
+
+    public void pc5(){
+        lock.lock();
+        try{
+            while(!thread.equals("C")){
+                cC.await();
+            }
+            for (int i = 0; i < 5; i++) {
+                System.out.println("C打印");
+            }
+            // C做完了通知A
+            thread="A";
+            cA.signal();
+        }catch (Exception e){
+            e.printStackTrace();
+        }finally {
+            lock.unlock();
+        }
+    }
+}
+```
+
+
+
 # 阻塞队列
 
 ## 什么是阻塞队列？什么情况会导致阻塞是？主要应用场景？
@@ -2286,3 +2489,259 @@ public class SemaphoreDemo {
 ![image-20200622210505560](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200622210505560.png)
 
 ![image-20200622211613494](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200622211613494.png)
+
+## 阻塞队列的应用场景举例？
+
+1、生产者消费者模式
+
+2、线程池底层原理
+
+3、消息中间件
+
+## 生产者消费者模式的传统版实现？（synchronized版和Lock版）
+
+1、sync+wait+notify
+
+```java
+public class ProdConsumer_TDemo1 {
+
+    public static void main(String[] args) {
+        Number1 number = new Number1();
+
+        new Thread(()->{
+            for (int i = 0; i < 5; i++) {
+                number.plus();
+            }
+        },"A").start();
+
+        new Thread(()->{
+            for (int i = 0; i < 5; i++) {
+                number.reduce();
+            }
+        },"B").start();
+    }
+}
+
+class Number1{
+    private int num = 0;
+
+    public synchronized void plus(){
+
+        // 使用while不用if,防止线程虚假唤醒。当前线程被唤醒后，会重新走验证程序，不会直接往下执行。
+        while( num!=0 ){
+            try {
+                this.wait();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        num++;
+        System.out.println(Thread.currentThread().getName()+"\tplus"+"\tnum="+num);
+        this.notify();
+    }
+
+    public synchronized void reduce(){
+
+        // 使用while不用if,防止线程虚假唤醒。当前线程被唤醒后，会重新走验证程序，不会直接往下执行。
+        while( num==0 ){
+            try {
+                this.wait();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        num--;
+        System.out.println(Thread.currentThread().getName()+"\treduce"+"\tnum="+num);
+        this.notify();
+    }
+}
+```
+
+2、lock+await+signalAll(Condition)
+
+```java
+public class ProdConsumer_TDemo2 {
+
+    public static void main(String[] args) {
+        Number2 number = new Number2();
+
+        new Thread(()->{
+            for (int i = 0; i < 5; i++) {
+                number.plus();
+            }
+        },"A").start();
+
+        new Thread(()->{
+            for (int i = 0; i < 5; i++) {
+                number.reduce();
+            }
+        },"B").start();
+    }
+
+
+}
+
+class Number2{
+    private int num = 0;
+    Lock lock = new ReentrantLock();
+    Condition condition = lock.newCondition();
+
+    public void plus(){
+        // 线程1调用了lock方法，加入到了AQS的等待队里里面去
+        lock.lock();
+        try{
+            // 使用while不用if,防止线程虚假唤醒。当前线程被唤醒后，会重新走验证程序，不会直接往下执行。
+            while( num!=0 ){
+                // 调用await方法后，从AQS队列里移除了，进入到了condition队列里面去，等待一个信号
+                condition.await();
+            }
+            num++;
+            System.out.println(Thread.currentThread().getName()+"\tplus"+"\tnum="+num);
+            // 调用signalAll发送信号的方法,Condition节点的线程1节点元素被取出，放在了AQS等待队列里（注意并没有被唤醒）
+            condition.signalAll();
+        }catch (Exception e){
+            e.printStackTrace();
+        }finally {
+            // 线程1释放锁，这时候AQS队列中只剩下线程2，线程2开始执行
+            lock.unlock();
+        }
+
+    }
+
+    public void reduce(){
+        lock.lock();
+        try{
+            // 使用while不用if,防止线程虚假唤醒。当前线程被唤醒后，会重新走验证程序，不会直接往下执行。
+            while( num==0 ){
+                condition.await();
+            }
+            num--;
+            System.out.println(Thread.currentThread().getName()+"\treduce"+"\tnum="+num);
+            condition.signalAll();
+        }catch (Exception e){
+            e.printStackTrace();
+        }finally {
+            lock.unlock();
+        }
+
+    }
+
+}
+```
+
+## 生产者消费者模式的阻塞队列版实现？
+
+```java
+/**
+ * 使用阻塞队列实现生产者消费者（不使用Lock/Condition相关的东西）。
+ * 题目：当flag=true时，启动生产者和消费者线程，一直循环做生产消费，当flag=false时，停止所有线程，程序运行结束。
+ * 测试：开启一个生产者和一个消费者，5秒钟修改flag，看执行效果。
+ * 核心：
+ *  num++操作改成 AtomicInteger;
+ *  BlockingQueue不写具体类，留接口给外部；
+ *  flag标记对所有线程可见，所以需要volatile。
+ *  打印：
+ *  启动生产者
+ * 启动消费者
+ * 生产者	成功入队	蛋糕1
+ * 消费者	成功出队	蛋糕1
+ * 生产者	成功入队	蛋糕2
+ * 消费者	成功出队	蛋糕2
+ * 生产者	成功入队	蛋糕3
+ * 消费者	成功出队	蛋糕3
+ * 生产者	成功入队	蛋糕4
+ * 消费者	成功出队	蛋糕4
+ * 生产者	成功入队	蛋糕5
+ * 消费者	成功出队	蛋糕5
+ * 消费者	消费等待超过2秒，消费失败
+ */
+public class ProdConsumer_BDemo {
+    public static void main(String[] args) {
+        // 如果生产速度快，就把容量弄大点，免得经常入队失败
+        MyResource rs = new MyResource(new ArrayBlockingQueue<String>(3));
+
+        new Thread(()->{
+            System.out.println("启动"+Thread.currentThread().getName());
+            try {
+                rs.myProducer();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        },"生产者").start();
+
+        new Thread(()->{
+            System.out.println("启动"+Thread.currentThread().getName());
+            try {
+                rs.myConsumer();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        },"消费者").start();
+
+        // 5s后修改flag,结束程序
+        try {
+            TimeUnit.SECONDS.sleep(5);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        rs.STOP();
+
+    }
+}
+
+class MyResource{
+
+    private AtomicInteger atomicInteger = new AtomicInteger(0);
+    private BlockingQueue<String> blockingQueue = null;
+    private volatile boolean FLAG=true;
+
+
+    public MyResource(BlockingQueue<String> blockingQueue) {
+        this.blockingQueue = blockingQueue;
+    }
+
+    public void STOP(){
+        FLAG=false;
+    }
+
+    public void myProducer() throws InterruptedException {
+        int id;
+        String cake;
+        boolean result;
+        while (FLAG){
+            // 创建蛋糕
+            id = atomicInteger.incrementAndGet();// 蛋糕id
+            cake = "蛋糕"+id;
+            // 蛋糕入队
+            result = blockingQueue.offer(cake, 2, TimeUnit.SECONDS);
+            if(result){
+                System.out.println(Thread.currentThread().getName()+"\t成功入队\t"+cake);
+            }else {
+                // 说明队列满了
+                System.out.println(Thread.currentThread().getName()+"\t入队失败\t"+cake);
+            }
+
+            // 生产者产的慢，产一个消费者就吃一个。
+            // 生产者产的快，就会入队失败，等消费者来吃。
+            TimeUnit.SECONDS.sleep(1);
+        }
+    }
+
+    public void myConsumer() throws InterruptedException {
+        while (FLAG){
+            // 消费蛋糕
+            String cake = blockingQueue.poll(2, TimeUnit.SECONDS);
+            if(cake==null || cake.equals("")){
+                System.out.println(Thread.currentThread().getName()+"\t消费等待超过2秒，消费失败");
+                // 通知生产者也退出，不然生产者一直循环尝试入队。
+//                FLAG=false;
+//                return;
+            }else{
+                System.out.println(Thread.currentThread().getName()+"\t成功出队\t"+cake);
+            }
+            // TimeUnit.SECONDS.sleep(2);
+        }
+    }
+```
+
