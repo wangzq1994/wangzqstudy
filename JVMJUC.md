@@ -1,4 +1,4 @@
-JVMJUC学习
+![image-20200624193534268](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200624193534268.png)JVMJUC学习
 
 ### 进程和线程
 
@@ -674,7 +674,79 @@ Future.get方法会使取结果的线程进入阻塞状态，知道线程执行�
         );
 ```
 
+#### 合理配置线程池参数，如何考虑？
 
+分情况讨论：
+
+1.cpu密集型。
+		1.即大量计算，没有阻塞。
+		2.一般公式：CPU核数+1 个线程的线程池
+2.io密集型
+		1.并不是一直在跑计算，很可能有很多阻塞等待。
+		2.尽可能多开，公式：cpu核数*2。
+		3.公式2：cpu核数/（1-阻塞系数），阻塞系数在0.8~0.9之间。8核就是8/(1-0.9) = 80个线程。
+
+#### 死锁是什么？产生死锁的主要原因？
+
+多线程抢资源造成互相等待
+
+原因：
+
+1. 系统资源不足
+2. 进程推荐顺序不合适
+3. 资源分配不当
+
+#### 死锁案例（demo）
+
+```java
+class HoldLockThread implements Runnable{
+    private String lockA;
+    private String lockB;
+
+    public HoldLockThread(String lockA, String lockB) {
+        this.lockA = lockA;
+        this.lockB = lockB;
+    }
+
+
+    @Override
+    public void run() {
+        synchronized (lockA){
+            System.out.println(Thread.currentThread().getName()+"\t持有"+lockA+"\t等待"+lockB);
+
+            try {TimeUnit.SECONDS.sleep(1);} catch (InterruptedException e) {e.printStackTrace(); }
+            synchronized (lockB){
+                System.out.println(Thread.currentThread().getName()+"\t持有"+lockB+"\t等待"+lockA);
+            }
+
+        }
+    }
+}
+
+/**
+ * 死锁案例
+ * 打印：
+ * A   持有钥匙1  等待钥匙2
+ * B   持有钥匙2  等待钥匙1
+ */
+public class DeadLockDemo {
+
+    public static void main(String[] args) {
+        new Thread(new HoldLockThread("钥匙1","钥匙2"),"A").start();
+        new Thread(new HoldLockThread("钥匙2","钥匙1"),"B").start();
+
+    }
+}
+```
+
+## 怎么排查死锁问题？使用过哪些命令行工具？
+
+解决：
+jps -l // 查看java进程 进程号
+jstack 进程号 // 查看堆栈信息
+打印：Found 1 deadlock.
+
+![image-20200624192336321](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200624192336321.png)
 
 # CAS
 
