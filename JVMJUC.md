@@ -297,7 +297,7 @@ public static void main(String[] args) {
 
 ![image-20200611162412315](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200611162412315.png)
 
-#### 多线程的获得方式
+#### 多线程的获得方式(四种)
 
 ##### 1.前三种
 
@@ -458,14 +458,14 @@ public static void main(String[] args) throws Exception{
 	}
 ```
 
-# java线程池
+# java线程池(底层就是 ThreadPoolExecutor)
 
 ##### 1、线程池的优势
 
 1. 降低系统资源消耗，通过重用已存在的线程，降低线程创建和销毁造成的消耗；
 2. 提高系统响应速度，当有任务到达时，通过复用已存在的线程，无需等待新线程的创建便能立即执行；
 3. 方便线程并发数的管控。因为线程若是无限制的创建，可能会导致内存占用过多而产生OOM，并且会造成cpu过度切换（cpu切换线程是有时间成本的（需要保持当前执行线程的现场，并恢复要执行线程的现场)
-4.  提供更强大的功能，延时定时线程池。
+4.  提高线程客观理性。统一分配、监控、调优。
 
 ##### 2、线程池的主要参数
 
@@ -476,21 +476,49 @@ public ThreadPoolExecutor(int corePoolSize, int maximumPoolSize, long keepAliveT
 }
 ```
 
-1、corePoolSize（线程池基本大小）：当向线程池提交一个任务时，若线程池已创建的线程数小于corePoolSize，即便此时存在空闲线程，也会通过创建一个新线程来执行该任务，直到已创建的线程数大于或等于corePoolSize时，（除了利用提交新任务来创建和启动线程（按需构造），也可以通过 prestartCoreThread() 或 prestartAllCoreThreads() 方法来提前启动线程池中的基本线程。）
+1. corePoolSize: 线程池中的常驻核心线程数。
 
-2、maximumPoolSize（线程池最大大小）：线程池所允许的最大线程个数。当队列满了，且已创建的线程数小于maximumPoolSize，则线程池会创建新的线程来执行任务。另外，对于无界队列，可忽略该参数。
+   任务来了->>>
 
-3、keepAliveTime（线程存活保持时间）当线程池中线程数大于核心线程数时，线程的空闲时间如果超过线程存活时间，那么这个线程就会被销毁，直到线程池中的线程数小于等于核心线程数。
+   - 线程小于corePoolSize  即便存在空闲线程，也会创建一个新线程执行该任务
 
-4、workQueue（任务队列）：用于传输和保存等待执行任务的阻塞队列。
+   - 线程大于corePoolSize 放入任务队列
 
-5、threadFactory（线程工厂）：用于创建新线程。threadFactory创建的线程也是采用new Thread()方式，threadFactory创建的线程名都具有统一的风格：pool-m-thread-n（m为线程池的编号，n为线程池内的线程编号）。
+     注意:也可通过 prestartCoreThread() 或 prestartAllCoreThreads() 方法提前启动线程池中的基本线程
 
-5、handler（线程饱和策略）：当线程池和队列都满了，再加入线程会执行此策略。
+2. maximumPoolSize（线程池最大大小）
+
+   - **当队列满了**，且已创建的线程数小于maximumPoolSize，则线程池会创建新的线程来执行任务
+
+     注意对于无界队列 可忽略该参数
+
+3. keepAliveTime（线程存活保持时间）当线程池中线程数大于核心线程数时，线程的空闲时间如果超过线程存活时间，那么这个线程就会被销毁，直到线程池中的线程数小于等于核心线程数。
+
+4. unit：keepAliveTime单位 (时分秒)
+
+5. workQueue：任务队列，被提交但未被执行的任务。
+
+6. threadFactory：线程工厂，用于创建线程，一般用 **默认的即可** threadFactory创建的线程也是采用new Thread()方式，threadFactory创建的线程名都具有统一的风格：pool-m-thread-n（m为线程池的编号，n为线程池内的线程编号
+
+7. handler（线程饱和策略）：当线程池和队列都满了，再加入线程会执行此策略。
 
 ##### 3、线程池流程
 
 ![image-20200612102304471](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200612102304471.png)
+
+### 线程池拒绝策略时什么？有哪些？分别是什么意思？
+
+**是什么？**
+
+等待队列满了，池中max线程也到了，这时就调用拒绝策略处理这个问题。
+**jdk内置4中拒绝策略：**
+
+RejectedExecutionHandler
+
+AbortPolicy：**默认**。直接抛出RejectedExecutionException异常阻止系统正常运行。
+CallerRunsPolicy：“调用者运行”。不抛弃任务也不抛异常，而是将任务回退给调用者，从而降低新任务流量。
+DiscardOldestPolicy：丢弃等待最久的任务。然后将当前任务加入队列，尝试再次提交当前任务。
+DiscardPolicy：直接丢弃任务。不做处理，不抛异常。如果允许任务丢弃，这是最好的策略。
 
 ##### 4、线程池为什么需要使用（阻塞）队列？
 
@@ -513,18 +541,25 @@ public ThreadPoolExecutor(int corePoolSize, int maximumPoolSize, long keepAliveT
 
 ##### 6、如何配置线程池
 
-CPU密集型任务
- 尽量使用较小的线程池，一般为CPU核心数+1。 因为CPU密集型任务使得CPU使用率很高，若开过多的线程数，会造成CPU过度切换。
+分情况讨论：
 
-IO密集型任务
- 可以使用稍大的线程池，一般为2*CPU核心数。 IO密集型任务CPU使用率并不高，因此可以让CPU在等待IO的时候有其他线程去处理别的任务，充分利用CPU时间。
-
-混合型任务
- 可以将任务分成IO密集型和CPU密集型任务，然后分别用不同的线程池去处理。 只要分完之后两个任务的执行时间相差不大，那么就会比串行执行来的高效。
- 因为如果划分之后两个任务执行时间有数据级的差距，那么拆分没有意义。
- 因为先执行完的任务就要等后执行完的任务，最终的时间仍然取决于后执行完的任务，而且还要加上任务拆分与合并的开销，得不偿失。
+1.cpu密集型。
+	1.即大量计算，没有阻塞。
+	2.一般公式：CPU核数+1 个线程的线程池
+2.io密集型
+	1.并不是一直在跑计算，很可能有很多阻塞等待。
+	2.尽可能多开，公式：cpu核数*2。
+	3.公式2：cpu核数/（1-阻塞系数），阻塞系数在0.8~0.9之间。8核就是8/(1-0.9) = 80个线程。
 
 ##### 7、java中提供的线程池
+
+! 线程池创建方式有多少种？
+Executors.newScheduledThreadPool() // 和调度相关
+Executors.newWorkStealingPool() // java8新增，可用处理器作为它的并行级别
+**三个常用实现方式：**
+Executors.newFixedThreadPool() // 固定个数线程。应用场景：执行长期任务，性能好。
+Executors.newSingleThreadExecutor(); // 线程池就一个线程。应用场景：任务需要一个个执行。
+Executors.newCachedThreadPool(); // 可扩容的，怎么扩由内部机制决定。应用场景：执行很多短期异步小程序 或 负载较轻的服务器。
 
 Executors类提供了4种不同的线程池：newCachedThreadPool, newFixedThreadPool, newScheduledThreadPool, newSingleThreadExecutor
 
@@ -532,11 +567,73 @@ Executors类提供了4种不同的线程池：newCachedThreadPool, newFixedThrea
 
 1、newCachedThreadPool：用来创建一个可以无限扩大的线程池，适用于负载较轻的场景，执行短期异步任务。（可以使得任务快速得到执行，因为任务时间执行短，可以很快结束，也不会造成cpu过度切换）
 
+```java
+newCachedThreadPool() {
+    return new ThreadPoolExecutor(0, Integer.MAX_VALUE,
+                                  60L, TimeUnit.SECONDS,
+                                  new SynchronousQueue<Runnable>());
+}
+```
+
 2、newFixedThreadPool：创建一个固定大小的线程池，因为采用无界的阻塞队列，所以实际线程数量永远不会变化，适用于负载较重的场景，对当前线程数量进行限制。（保证线程数可控，不会造成线程过多，导致系统负载更为严重）
+
+```java
+newFixedThreadPool(int nThreads) {
+    return new ThreadPoolExecutor(nThreads, nThreads,
+                                  0L, TimeUnit.MILLISECONDS,
+                                  new LinkedBlockingQueue<Runnable>());
+}
+```
 
 3、newSingleThreadExecutor：创建一个单线程的线程池，适用于需要保证顺序执行各个任务。
 
+```java
+newSingleThreadExecutor() {
+    return new FinalizableDelegatedExecutorService
+        (new ThreadPoolExecutor(1, 1,
+                                0L, TimeUnit.MILLISECONDS,
+                                new LinkedBlockingQueue<Runnable>()));
+}
+```
+
 4、newScheduledThreadPool：适用于执行延时或者周期性任务。
+
+#### 线程池3个常用的创建方式（demo)
+
+```java
+ public static void main(String[] args) {
+
+//        ExecutorService threadPool = Executors.newFixedThreadPool(5);
+//        ExecutorService threadPool = Executors.newSingleThreadExecutor();
+//        ExecutorService threadPool = Executors.newCachedThreadPool();
+//        Executors.newScheduledThreadPool()
+
+        ThreadPoolExecutor threadPool = new ThreadPoolExecutor(
+                2,
+                5,
+                1,
+                TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(3),
+                Executors.defaultThreadFactory(),
+                new ThreadPoolExecutor.DiscardPolicy()   // 如果是CallerRunsPolicy，打印 main    办理业务，说明将任务回退给了调用者main线程
+        );
+
+        try{
+            for (int i = 0; i < 11; i++) {
+                // 执行
+                threadPool.execute(()->{
+                    System.out.println(Thread.currentThread().getName()+"\t办理业务");
+                });
+            }
+        }catch(Exception e){
+            e.printStackTrace();
+        }finally{
+            // 关闭
+            threadPool.shutdown();
+        }
+    }
+}
+```
 
 ##### 8、execute()和submit()方法
 
@@ -564,103 +661,1207 @@ Future.get方法会使取结果的线程进入阻塞状态，知道线程执行�
 
 推荐使用通过自定义new  ThreadPoolExecutor 这种方式创建
 
-### 并发队列阻塞式与非阻塞式的区别
+```java
 
-在并发队列上JDK提供了两套实现，一个是以ConcurrentLinkedQueue为代表的高性能队列非阻塞，一个是以BlockingQueue接口为代表的阻塞队列，无论哪种都继承自Queue。
+        ThreadPoolExecutor threadPool = new ThreadPoolExecutor(
+                2,
+                5,
+                1,
+                TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(3),
+                Executors.defaultThreadFactory(),
+                new ThreadPoolExecutor.DiscardPolicy()   // 如果是CallerRunsPolicy，打印 main    办理业务，说明将任务回退给了调用者main线程
+        );
+```
 
-**队列遵循先进先出，后进后出的原则**。
 
-阻塞式队列比非阻塞式队列性好。
 
-### 阻塞式队列与非阻塞队列的区别：
+# CAS
 
-阻塞式队列：
+提问线路：CAS—> Unsafe—> CAS底层原理 —> 原子引用更新 —> 如何规避ABA问题
 
- 入列(存)：阻塞式队列，如果存放的队列超出队列的总数，是时候会进行等待(阻塞)。当队列达到总数的时候，入列(生产者)会进行阻塞。这时候只有当消费者消费了队列中的队列之后，生产者才可以继续往队列中存放队列。
+## compareAndSet怎么用？
 
- 出列(取)：如果获取队列为空的情况下，这时候也会进行等待(阻塞)。这时候队列中没有队列，消费者无法消费队列，只有生产者往对队列中存放队列之后，消费者才可以进行消费。
+比较并交换（compareAndSet）
 
-队列中的队列如果被消费了就会从队列中删除掉。
+```java
+/**
+ * boolean compareAndSet(int expect, int update)
+ * - 如果主内存的值=期待值expect，就将主内存值改为update
+ * - 该方法可以检测线程a的操作变量X没有被其他线程修改过
+ * - 保证了线程安全
+ */
+public static void main(String[] args) {
+    AtomicInteger atomicInteger = new AtomicInteger(5);
+    System.out.println(atomicInteger.compareAndSet(5, 10)+ "\t" + atomicInteger);
+    System.out.println(atomicInteger.compareAndSet(5, 20)+ "\t" + atomicInteger);
+    //true	10
+    //false	10
+}
+12345678910111213
+```
 
-白话文描述：
+## CAS底层原理简述？
 
-阻塞队列与普通队列的区别在于，当队列是空的时，从队列中获取元素的操作将会被阻塞，或者当队列是满时，往队列里添加元素的操作会被阻塞。试图从空的阻塞队列中获取元素的线程将会被阻塞，直到其他的线程往空的队列插入新的元素。同样，试图往已满的阻塞队列中添加新元素的线程同样也会被阻塞，直到其他的线程使队列重新变得空闲起来，如从队列中移除一个或者多个元素，或者完全清空队列.
+1. Compare-And-Swap。是一条CPU并发原语。（原语：操作系统范畴，依赖硬件，不被中断。）
+2. 功能是判断内存某个位置的值是否为预期值（Compare），是就更新（Swap），这个过程是原子的。
+3. 功能描述：
+   1. 判断内存某个位置的值是否为预期值（Compare），是就更新（Swap），这个过程是原子的。
+   2. cas有三个操作数，内存值V，旧预期值A，要更新的值B。仅当预期值A=内存值V时，才将内存值V修改为B，否则什么都不做。
+4. 自旋：比较并交换，直到比较成功
+5. 底层靠Unsafe类保证原子性。
 
-   1.ArrayDeque, （数组双端队列） 
-   2.PriorityQueue, （优先级队列） 
-	3.ConcurrentLinkedQueue, （基于链表的并发队列） 
-	4.DelayQueue, （延期阻塞队列）（阻塞队列实现了BlockingQueue接口） 
-	5.ArrayBlockingQueue, （基于数组的并发阻塞队列） 
-	6.LinkedBlockingQueue, （基于链表的FIFO阻塞队列） 
-	7.LinkedBlockingDeque, （基于链表的FIFO双端阻塞队列） 
-	8.PriorityBlockingQueue, （带优先级的无界阻塞队列） 
-	9.SynchronousQueue （并发同步阻塞队列）
+## getAndIncrement() 源码解析（用了cas保证线程安全）
 
-##### ConcurrentLinkedQueue
+```java
+/**
+ * 参数说明：
+ * this: atomicInteger对象
+ * valueOffset：对象的内存地址
+ * unsafe：sun.misc.Unsafe类
+ * AtomicInteger中变量value使用volatile修饰，保证内存可见。
+ * 结论：底层依赖CAS操作/Unsafe类
+ */
+public final int getAndIncrement() {
+    return unsafe.getAndAddInt(this, valueOffset, 1);
+}
+/**
+ * compareAndSwapInt：即CAS
+ * while: 如果修改失败，会一直尝试修改，直到成功。
+ */
+public final int getAndAddInt(Object var1, long var2, int var4) {
+    int var5;
+    do {
+        var5 = this.getIntVolatile(var1, var2);
+    } while(!this.compareAndSwapInt(var1, var2, var5, var5 + var4));
 
-ConcurrentLinkedQueue : 是一个适用于高并发场景下的队列，通过无锁的方式，实现了高并发状态下的高性能，通常ConcurrentLinkedQueue性能好于BlockingQueue.它是一个基于链接节点的无界线程安全队列。该队列的元素遵循先进先出的原则。头是最先加入的，尾是最近加入的，该队列不允许null元素。
+    return var5;
+}
+1234567891011121314151617181920212223
+```
 
-ConcurrentLinkedQueue重要方法:
-add 和offer() 都是加入元素的方法(在ConcurrentLinkedQueue中这俩个方法没有任何区别)
-poll() 和peek() 都是取头元素节点，区别在于前者会删除元素，后者不会。
+简述：
 
-##### BlockingQueue
+1. 调用了Unsafe类的getAndAddInt
+2. getAndAddInt使用cas一直循环尝试修改主内存
 
-阻塞队列（BlockingQueue）是一个支持两个附加操作的队列。这两个附加的操作是：
+## 对Unsafe的理解?
 
-在队列为空时，获取元素的线程会等待队列变为非空。当队列满时，存储元素的线程会等待队列可用。
+Unsave类
 
-阻塞队列常用于生产者和消费者的场景，生产者是往队列里添加元素的线程，消费者是从队列里拿元素的线程。阻塞队列就是生产者存放元素的容器，而消费者也只从容器里拿元素。
+1. 该类所有方法都是native修饰，直接调用底层资源。sun.misc包中。
+2. 可以像C的指针一样直接操作内存。java的CAS操作依赖Unsafe类的方法。
 
-BlockingQueue即阻塞队列，从阻塞这个词可以看出，在某些情况下对阻塞队列的访问可能会造成阻塞。被阻塞的情况主要有如下两种：
+## ! CAS有哪些缺点？
 
-1. 当队列满了的时候进行入队列操作
+1. 循环时间长，开销大
+   1. 如果cas失败，就一直do while尝试。如果长时间不成功，可能给CPU带来很大开销。
+2. 只能保证一个共享变量的原子操作
+   1. 如果时多个共享变量，cas无法保证原子性，只能加锁，锁住代码段。
+3. 引出来ABA问题。
 
-2. 当队列空了的时候进行出队列操作
+# ABA问题
 
-因此，当一个线程试图对一个已经满了的队列进行入队列操作时，它将会被阻塞，除非有另一个线程做了出队列操作；同样，当一个线程试图对一个空队列进行出队列操作时，它将会被阻塞，除非有另一个线程进行了入队列操作。
+## 简述ABA问题和解决方案？
 
-在Java中，BlockingQueue的接口位于java.util.concurrent 包中(在Java5版本开始提供)，由上面介绍的阻塞队列的特性可知，阻塞队列是线程安全的。
+简述版：
 
-在新增的Concurrent包中，BlockingQueue很好的解决了多线程中，如何高效安全“传输”数据的问题。通过这些高效并且线程安全的队列类，为我们快速搭建高质量的多线程程序带来极大的便利。本文详细介绍了BlockingQueue家庭中的所有成员，包括他们各自的功能以及常见使用场景。
+ABA问题描述: 线程1做CAS操作将A改为B再改为A，而线程2再做CAS时修改成功了，这不符合设计思想。
 
-认识BlockingQueue
+怎么解决：AtomicStampReference时间戳原子引用
 
-阻塞队列，顾名思义，首先它是一个队列，而一个队列在数据结构中所起的作用大致如下图所示：
+## ABA问题描述？问题出在哪？
 
-从上图我们可以很清楚看到，通过一个共享的队列，可以使得数据由队列的一端输入，从另外一端输出；
+ABA问题描述：
 
-常用的队列主要有以下两种：（当然通过不同的实现方式，还可以延伸出很多不同类型的队列，DelayQueue就是其中的一种）
+- 比如线程1从内存位置V中取出A，此时线程2也取出A。且线程2做了一次cas将值改为了B，然后又做了一次cas将值改回了A。此时线程1做cas发现内存中还是A，则线程1操作成功。这个时候实际上A值已经被其他线程改变过，这与设计思想是不符合的。
 
-　　先进先出（FIFO）：先插入的队列的元素也最先出队列，类似于排队的功能。从某种程度上来说这种队列也体现了一种公平性。
+这个过程问题出在哪？
 
-　　后进先出（LIFO）：后插入队列的元素最先出队列，这种队列优先处理最近发生的事件。
+- 如果只在乎结果，ABA不介意B的存在，没什么问题
+- 如果B的存在会造成影响，需要通过AtomicStampReference，加时间戳解决。
 
-   多线程环境中，通过队列可以很容易实现数据共享，比如经典的“生产者”和“消费者”模型中，通过队列可以很便利地实现两者之间的数据共享。假设我们有若干生产者线程，另外又有若干个消费者线程。如果生产者线程需要把准备好的数据共享给消费者线程，利用队列的方式来传递数据，就可以很方便地解决他们之间的数据共享问题。但如果生产者和消费者在某个时间段内，万一发生数据处理速度不匹配的情况呢？理想情况下，如果生产者产出数据的速度大于消费者消费的速度，并且当生产出来的数据累积到一定程度的时候，那么生产者必须暂停等待一下（阻塞生产者线程），以便等待消费者线程把累积的数据处理完毕，反之亦然。然而，在concurrent包发布以前，在多线程环境下，我们每个程序员都必须去自己控制这些细节，尤其还要兼顾效率和线程安全，而这会给我们的程序带来不小的复杂度。好在此时，强大的concurrent包横空出世了，而他也给我们带来了强大的BlockingQueue。（在多线程领域：所谓阻塞，在某些情况下会挂起线程（即阻塞），一旦条件满足，被挂起的线程又会自动被唤醒）
+## 原子更新引用是啥？
 
- 
+AtomicStampReference，使用时间戳，解决cas中出现的ABA问题。
 
-##### **ArrayBlockingQueue**
+## AtomicReference使用代码演示
 
-ArrayBlockingQueue是一个有边界的阻塞队列，它的内部实现是一个数组。有边界的意思是它的容量是有限的，我们必须在其初始化的时候指定它的容量大小，容量大小一旦指定就不可改变。
+demo
 
-ArrayBlockingQueue是以先进先出的方式存储数据，最新插入的对象是尾部，最新移出的对象是头部。
+```java
+/**
+ * 如果希望原子操作的变量是User,Book,此时需要使用AtomicReference类
+ */
+public static void main(String[] args) {
+    User z3 = new User("z3",18);
+    User l4 = new User("l4",19);
+    AtomicReference<User> atomicReference = new AtomicReference<>(z3);
+    System.out.println(atomicReference.compareAndSet(z3, l4) + "\t" + atomicReference.get().toString());
+    System.out.println(atomicReference.compareAndSet(z3, l4) + "\t" + atomicReference.get().toString());
+    //truecom.mxx.juc.User@4554617c
+    //false  com.mxx.juc.User@4554617c
 
- 
+}
+12345678910111213
+```
 
-##### LinkedBlockingQueue
+## AtomicReference存在ABA问题代码验证
 
-LinkedBlockingQueue阻塞队列大小的配置是可选的，如果我们初始化时指定一个大小，它就是有边界的，如果不指定，它就是无边界的。说是无边界，其实是采用了默认大小为Integer.MAX_VALUE的容量 。它的内部实现是一个链表。和ArrayBlockingQueue一样，LinkedBlockingQueue 也是以先进先出的方式存储数据，最新插入的对象是尾部，最新移出的对象是头部。
+demo
 
-##### PriorityBlockingQueue
+```java
+AtomicReference atomicReference = new AtomicReference<Integer>(100);
+/**
+ * ABA问题验证：
+ * 1--ABA
+ * 2--A,C
+ * @param args
+ */
+public static void main(String[] args) {
+    ABADemo abaDemo = new ABADemo();
 
-PriorityBlockingQueue是一个没有边界的队列，它的排序规则和 java.util.PriorityQueue一样。需要注 意，PriorityBlockingQueue中允许插入null对象。
+    new Thread(()->{
+        abaDemo.atomicReference.compareAndSet(100,101);
+        abaDemo.atomicReference.compareAndSet(101,100);
+    },"1").start();
 
-所有插入PriorityBlockingQueue的对象必须实现 java.lang.Comparable接口，队列优先级的排序规则就 是按照我们对这个接口的实现来定义的。另外，我们可以从PriorityBlockingQueue获得一个迭代器Iterator，但这个迭代器并不保证按照优先级顺 序进行迭代。
+    new Thread(()->{
+        // 睡1s等线程1执行完ABA
+        try {TimeUnit.SECONDS.sleep(1);} catch (InterruptedException e) { e.printStackTrace();}
+        System.out.println(abaDemo.atomicReference.compareAndSet(100, 2020)+"\t"+abaDemo.atomicReference.get());
+        //true  2020
 
-##### SynchronousQueue
+    },"2").start();
+}
+1234567891011121314151617181920212223
+```
 
-SynchronousQueue队列内部仅允许容纳一个元素。当一个线程插入一个元素后会被阻塞，除非这个元素被另一个线程消费。
+## AtomicStampReference解决ABA问题代码验证
+
+解决思路：每次变量更新的时候，把变量的版本号加一，这样只要变量被某一个线程修改过，该变量版本号就会发生递增操作，从而解决了ABA变化
+
+```java
+AtomicStampedReference atomicStampedReference = new AtomicStampedReference<Integer>(100,1);
+
+public static void main(String[] args) {
+    // ABAProblem();
+    ABADemo abaDemo = new ABADemo();
+
+    new Thread(()->{
+        // 等线程2读到初始版本号的值
+        try {TimeUnit.SECONDS.sleep(1);} catch (InterruptedException e) { e.printStackTrace();}
+        System.out.println("线程1在ABA前的版本号："+abaDemo.atomicStampedReference.getStamp());
+        abaDemo.atomicStampedReference.compareAndSet(100,101,abaDemo.atomicStampedReference.getStamp(),abaDemo.atomicStampedReference.getStamp()+1);
+        abaDemo.atomicStampedReference.compareAndSet(101,100,abaDemo.atomicStampedReference.getStamp(),abaDemo.atomicStampedReference.getStamp()+1);
+        System.out.println("线程1在ABA后的版本号："+abaDemo.atomicStampedReference.getStamp());
+    },"1").start();
+
+    new Thread(()->{
+        // 存一下修改前的版本号
+        int stamp = abaDemo.atomicStampedReference.getStamp();
+        System.out.println("线程2在修改操作前的版本号："+stamp);
+        // 睡1s等线程1执行完ABA
+        try {TimeUnit.SECONDS.sleep(2);} catch (InterruptedException e) { e.printStackTrace();}
+        System.out.println(abaDemo.atomicStampedReference.compareAndSet(100,2020,stamp,abaDemo.atomicStampedReference.getStamp()+1)+ "\t" + abaDemo.atomicStampedReference.getReference());
+        //线程2在修改操作前的版本号：1
+        //线程1在ABA前的版本号：1
+        //线程1在ABA后的版本号：3
+        //false 100
+
+        },"2").start();
+
+}
+123456789101112131415161718192021222324252627282930
+```
+
+# 集合类不安全
+
+## ArrayList线程不安全演示-什么故障？什么原因？怎么解决？
+
+ArrayList底层是一个数组，默认大小10，超过就扩容，扩原值的一半10+5=15
+
+线程不安全，因为add方法没有加锁。
+
+不安全案例：
+
+```java
+public class ContainerNotSafeDemo {
+
+    /**
+     * 1. 故障
+     *      java.util.ConcurrentModificationException   并发修改异常
+     *
+     * 2. 原因
+     *      线程并发修改导致，线程1正在写入，线程2抢占资源，导致数据不一致。
+     *
+     * 3. 解决
+     *      1 new Vector(); add方法加锁，线程安全，并发性差。
+     *      2 Collections.synchronizedList(new ArrayList<>()); 包装成安全的，还是加锁，并发性差。
+     *      3 new CopyOnWriteArrayList<>();  juc的类，写时复制
+     * 4. 优化
+     */
+    public static void main(String[] args) {
+//        List<String> list = new ArrayList<>();
+//        List<String> list = new Vector<>();
+        List<String> list = Collections.synchronizedList(new ArrayList<>());
+//        List<String> list = new CopyOnWriteArrayList<>();
+
+        for (int i = 1; i <= 30; i++) {
+            new Thread(()->{
+                list.add(UUID.randomUUID().toString().substring(0,4));
+                System.out.println(Thread.currentThread().getName()+"\t"+list);
+            },String.valueOf(i)).start();
+        }
+    }
+}
+1234567891011121314151617181920212223242526272829
+```
+
+## CopyOnWriteArrayList原理？它有什么好？
+
+参考：https://blog.csdn.net/linsongbin1/article/details/54581787
+
+add源码：
+
+```java
+public boolean add(E e) {
+    // 1. 加锁
+    final ReentrantLock lock = this.lock;
+    lock.lock();
+    try {
+        Object[] elements = getArray();
+        int len = elements.length;
+        // 2. 拷贝数组
+        Object[] newElements = Arrays.copyOf(elements, len + 1);
+        // 3. 新增元素到新数组
+        newElements[len] = e;
+        // 4. 将array引用指向新数组
+        setArray(newElements);
+        return true;
+    } finally {
+        // 解锁
+        lock.unlock();
+    }
+}
+12345678910111213141516171819
+```
+
+解释写时复制：
+
+1. 写操作时，先从原有的数组中拷贝一份出来，然后在新的数组做写操作，写完之后，再将原来的数组引用指向到新数组。整个add操作都是在**锁的保护下进行的**。
+2. 读操作时，如果写完成且引用指向新数组，则读到的是最新数据；否则读到的是原始数组数据。可见**读操作是不加锁的**。
+
+## CopyOnWriteArrayList 缺点&使用场合
+
+1. **消耗内存**。写操作，拷贝数组，消耗内存，数组大的话可能导致gc
+2. **不能实时读**。拷贝新增需要时间，读到的可能是旧数据，能保证最终一致性，但不满足实时要求。
+
+因此，适合**读多写少**的场景。
+
+## CopyOnWriteArrayList透露的思想
+
+1. 读写分离，提高并发
+2. 最终一致性
+3. 通过另辟空间，来解决并发冲突
+
+## 集合类不安全之Set-演示/故障/解决
+
+Set同理
+
+HashSet > Collections.synchronizedSet() > CopyOnWriteArraySet
+
+且CopyOnWriteArraySet底层还是用的CopyOnWriteArrayList
+
+HashSet底层是HashMap, add(key,一个常量)
+
+## 集合类不安全之Map-演示/故障/解决
+
+Map类似
+
+HashMap > Collections.synchronizedMap() > ConcurrentHashMap
+
+## HashMap底层实现原理-jdk7
+
+可参考：
+
+- 2018/10/30/20181030111752438/#10-4-HashMap与ConcurrentHashMap解析
+- HashMap源码分析：https://blog.csdn.net/weixin_36910300/article/details/79985197
+
+**map的存储结构是什么？**
+
+1. Hash表（数组+链表）
+2. key-value构成一个entry对象
+3. 数组容量：默认16，始终保持 2^n（为了存取高效，减少碰撞，数据分配均匀）
+
+**new HashMap<>()底层发生了什么？**
+
+创建了长度=16的 Entry table。
+
+**源码分析**
+
+- capacity : 当前数组容量
+- loadFactor：负载因子，默认为 0.75。
+- threshold：扩容的阈值，等于 capacity * loadFactor。当元素个数超过这个值就触发扩容。
+- MAXIMUM_CAPACITY = 1 << 30：最大的容量为 2 ^ 30
+
+```java
+//调用无参构造器
+public HashMap() {
+    //默认初始容量大小为16,默认的加载因子为0.75f
+    this(DEFAULT_INITIAL_CAPACITY, DEFAULT_LOAD_FACTOR);
+}
+
+public HashMap(int initialCapacity, float loadFactor) {
+    //初始容量不能小于0
+    if (initialCapacity < 0)
+        throw new IllegalArgumentException("Illegal initial capacity: " +
+                                           initialCapacity);
+    //初始容量不能超过MAXIMUM_CAPACITY
+    if (initialCapacity > MAXIMUM_CAPACITY)
+        initialCapacity = MAXIMUM_CAPACITY;
+    //加载因子不能小于等于0,或者加载因子不能是非数字   
+    if (loadFactor <= 0 || Float.isNaN(loadFactor))
+        throw new IllegalArgumentException("Illegal load factor: " +
+                                           loadFactor);
+    //设置加载因子
+    this.loadFactor = loadFactor;
+    //设置临界值
+    threshold = initialCapacity;
+    //伪构造,里面没有代码
+    init();
+}
+12345678910111213141516171819202122232425
+```
+
+**map.put(key1,value1)底层发生了什么？**
+
+1. 求key1的hash值，调用hashCode()，该hash值用来计算Entry数组下标，得到存放位置。
+2. 如果该位置为空，则添加成功。
+3. 如果不为空，意味着该位置存在链表：
+   1. 如果hash值与其他key不同，则添加成功。
+   2. 如果key1的hash值有key与之相同，则调用equal()，继续比较：
+      1. 如果equal返回false，则添加成功。
+      2. 如果equal返回true，则使用value1替换旧值（修改操作）
+
+**map.get(key1)底层发生了什么？**
+
+1. 根据key1计算hash，找到对应数组下标。
+2. 遍历该位置处的链表，找到key1.equal(key2)为true的entry，返回其value。
+
+**扩容的原理？**
+
+扩容后，数组大小为原来的 2 倍。
+
+## ConcurrentHashMap底层原理-jdk7
+
+关键词：Segment数组/基于分段锁/提高并发
+
+1. 引入一个Segment数组。每个Segment单元都包含一个与HashMap结构差不多hash表
+2. 读取过程：
+   1. 先取key的hash值，取高sshift位决定属于哪个Segment单元。
+   2. 接着就是HashMap那一套
+3. Segment继承jucReetrantLock，上锁方便，即分段锁。因此segment[1]锁了，不影响其他Segment单元并发。
+
+## HashMap底层实现原理-jdk8
+
+与jdk7的不同的地方：
+
+1. new HashMap()时，不创建长度为16的数组。
+
+2. 底层使用Node[], 而不是Entry[]
+
+3. 数组结构采用
+
+   数组+链表+红黑树
+
+   1. 触发时机：当某索引位置链表长度>8 且 数组长度>64时，次索引位置的链表改为红黑树
+   2. 红黑树的关键性质: 从根到叶子最长的可能路径不多于最短的可能路径的两倍长。结果是这棵树大致上是平衡的。
+   3. 目的：加快检索速度
+
+## ! ConcurrentHashMap底层原理-jdk8
+
+参考：https://www.jianshu.com/p/5dbaa6707017
+
+底层结构
+
+- 和 1.8 HashMap 结构类似，也是数组+链表+红黑树的。**取消了Segment 分段锁**
+
+那如何保证线程安全的？
+
+- **CAS + synchronized + volatile 来保证并发安全性**，具体的如下
+
+put方法逻辑
+
+源代码解析：
+
+```java
+/** Implementation for put and putIfAbsent */
+final V putVal(K key, V value, boolean onlyIfAbsent) {
+    if (key == null || value == null) throw new NullPointerException();
+    //1. 计算key的hash值
+    int hash = spread(key.hashCode());
+    int binCount = 0;
+    for (Node<K,V>[] tab = table;;) {
+        Node<K,V> f; int n, i, fh;
+        //2. 判断Node[]数组是否初始化，没有则进行初始化操作
+        if (tab == null || (n = tab.length) == 0)
+            tab = initTable();
+        //3. 通过hash定位数组的索引坐标，是否有Node节点，如果没有则使用CAS进行添加（链表的头节点），添加失败则进入下次循环。
+        else if ((f = tabAt(tab, i = (n - 1) & hash)) == null) {
+            if (casTabAt(tab, i, null,
+                         new Node<K,V>(hash, key, value, null)))
+                break;                   // no lock when adding to empty bin
+        }
+        //4. 检查到内部正在扩容，就帮助它一块扩容。
+        else if ((fh = f.hash) == MOVED)
+            tab = helpTransfer(tab, f);
+        // 如果该坐标Node不为null且没有正在扩容，就加锁，进行链表/红黑树 节点添加操作
+        else {
+            V oldVal = null;
+            synchronized (f) {
+                if (tabAt(tab, i) == f) {
+                    //5. 当前为链表，在链表中插入新的键值对
+                    if (fh >= 0) {
+                        binCount = 1;
+                        for (Node<K,V> e = f;; ++binCount) {
+                            K ek;
+                            if (e.hash == hash &&
+                                ((ek = e.key) == key ||
+                                 (ek != null && key.equals(ek)))) {
+                                oldVal = e.val;
+                                if (!onlyIfAbsent)
+                                    e.val = value;
+                                break;
+                            }
+                            Node<K,V> pred = e;
+                            if ((e = e.next) == null) {
+                                pred.next = new Node<K,V>(hash, key,
+                                                          value, null);
+                                break;
+                            }
+                        }
+                    }
+                    // 6.当前为红黑树，将新的键值对插入到红黑树中
+                    else if (f instanceof TreeBin) {
+                        Node<K,V> p;
+                        binCount = 2;
+                        if ((p = ((TreeBin<K,V>)f).putTreeVal(hash, key,
+                                                       value)) != null) {
+                            oldVal = p.val;
+                            if (!onlyIfAbsent)
+                                p.val = value;
+                        }
+                    }
+                }
+            }
+            // 7.判断链表长度已经达到临界值8（默认值），当节点超过这个值就需要把链表转换为树结构
+            if (binCount != 0) {
+                if (binCount >= TREEIFY_THRESHOLD)
+                    treeifyBin(tab, i);
+                if (oldVal != null)
+                    return oldVal;
+                break;
+            }
+        }
+    }
+    //8.对当前容量大小进行检查，如果超过了临界值（实际大小*加载因子）就需要扩容 
+    addCount(1L, binCount);
+    return null;
+}
+12345678910111213141516171819202122232425262728293031323334353637383940414243444546474849505152535455565758596061626364656667686970717273
+```
+
+解析：对当前的table进行**无条件自循环直到put成功（cas自旋）**。
+
+1. 如果数组下标没有Node节点，就用**CAS+自旋**添加链表头节点。
+2. 如果有Node节点，就加synchronized，添加链表或红黑树节点。
+
+get操作，由于数组被volatile修饰了，因此不用担心数组的可见性问题。
+
+```java
+volatile Node<K,V>[] table;
+1
+```
+
+## Map类的各种对比
+
+- HashMap和ConcurrentHashMap对比
+- HashMap和HashTable的对比
+- HashTable和ConcurrentHashMap对比
+
+# Java锁
+
+## Java 15锁，列举一些？
+
+1.公平锁 / 非公平锁
+2.可重入锁 / 不可重入锁
+3.独享锁 / 共享锁
+4.互斥锁 / 读写锁
+5.乐观锁 / 悲观锁
+6.分段锁
+7.偏向锁 / 轻量级锁 / 重量级锁
+8.自旋锁
+
+## 公平和非公平锁是什么？两者区别（优缺点）？两种锁举例？
+
+是什么？
+
+- 公平锁：多个线程按照申请锁的顺序来获取锁。
+- 非公平锁：多个线程获取锁的顺序不是按照申请舒顺序来的，有可能后申请的线程比先申请的线程优先获取锁。
+  高并发下，有可能造成优先级反转或者饥饿现象。
+
+区别：
+
+- 公平锁：保证顺序（队列，FIFO），性能下降。
+- 非公平：先尝试直接占有锁，如果尝试失败，再采用类似公平锁的方式。优点在于吞吐量比公平锁大。
+
+举例：
+
+- ReentrantLock可以指定创建公平锁或非公平锁，无参构造默认创建非公平锁。
+- synchronized是非公平的。
+
+## 可重入锁是什么？与不可重入的区别？可重入锁举例？作用？实现原理？
+
+是什么？
+
+- 也叫递归锁
+- 当一个线程获取某个对象锁后，可以再次获取同一把对象锁。
+- 即，线程可进入任何他所拥有的对象锁所同步着的代码块。
+
+区别？
+
+```java
+public synchronized  void m1(){
+      m1();
+}
+123
+```
+
+- 可重入锁：某线程进入外层m1后，可以再次进入递归m1方法。也叫递归锁。
+- 不可重入锁：某线程进入外部m1后，不可再进如内部m1，必须等待锁释放。这里就造成了死锁。
+
+举例：
+
+- ReentrantLock/synchronized就是典型的可重入锁
+
+作用：
+
+- 避免死锁。案例：递归
+
+实现原理：
+
+- 计数器：进入最外层计数器=1，每递归一次，计数器+1，每退出一层，计数器-1，直到计数器=0，说明退出了最外层，此时该线程释放锁对象，其他线程才能获取该锁。
+
+## 可重入锁代码验证
+
+synchronized
+
+```java
+public class SynchronizedLockDemo {
+
+    public synchronized void m1(){
+        System.out.println(Thread.currentThread().getName() + "----m1----");
+        m2();
+    }
+
+    public synchronized void m2(){
+        System.out.println(Thread.currentThread().getName() + "----m2----");
+    }
+
+    /**
+     * 可以看出，m1,m2是同一把锁，只有线程释放最外层锁，其他线程才能占用该锁。
+     * @param args
+     */
+    public static void main(String[] args) {
+        SynchronizedLockDemo rd = new SynchronizedLockDemo();
+        for (int i = 0; i < 5; i++) {
+            new Thread(()->{
+                rd.m1();
+            },String.valueOf(i)).start();
+        }
+    }
+    //0----m1----
+    //0----m2----
+    //4----m1----
+    //4----m2----
+    //3----m1----
+    //3----m2----
+    //2----m1----
+    //2----m2----
+    //1----m1----
+    //1----m2----
+}
+12345678910111213141516171819202122232425262728293031323334
+```
+
+ReentrantLock
+
+```java
+public class ReentrantLockDemo {
+
+    Lock lock = new ReentrantLock();
+
+    public void m1(){
+        lock.lock();
+//        lock.lock();
+        try {
+
+            System.out.println(Thread.currentThread().getName() + "----m1----");
+            m2();
+
+        }finally {
+            lock.unlock();
+//            lock.unlock();
+        }
+    }
+
+    public void m2(){
+        lock.lock();
+        try {
+
+            System.out.println(Thread.currentThread().getName() + "----m2----");
+
+        }finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * 锁要成对出现，否则：
+     *  - 多一个lock.lock()会造成锁无法释放,程序卡住
+     *  - 多一个lock.unlock()直接报错
+     */
+    public static void main(String[] args) {
+        ReentrantLockDemo rd = new ReentrantLockDemo();
+        for (int i = 0; i < 5; i++) {
+            new Thread(()->{
+                rd.m1();
+            },String.valueOf(i)).start();
+        }
+        //0----m1----
+        //0----m2----
+        //2----m1----
+        //2----m2----
+        //1----m1----
+        //1----m2----
+        //3----m1----
+        //3----m2----
+        //4----m1----
+        //4----m2----
+    }
+}
+1234567891011121314151617181920212223242526272829303132333435363738394041424344454647484950515253
+```
+
+## 自旋锁是什么？优点？缺点？
+
+- 自旋锁（spinlock）是指尝试获取锁的对象不会立即阻塞，而是采用循环的方式取尝试获取锁。好处是减少线程上下文切换的消耗，缺点是循环会消耗CPU
+
+## 手写一个自旋锁
+
+```java
+public class SpinLockDemo {
+
+    /**
+     * 手写自旋锁
+     * 自旋锁的核心：while+cas+原子引用线程
+     *
+     * A线程加锁，一顿操作5秒钟，解锁。B线程一直自旋等待A线程释放锁，然后获取锁。
+     * 打印结果：
+     * A尝试获取锁
+     * A成功获取锁
+     * A一顿操作5秒...
+     * B尝试获取锁
+     * A释放锁
+     * B成功获取锁
+     * B一顿操作
+     * B释放锁
+     */
+    public static void main(String[] args) {
+        SpinLockDemo sDemo = new SpinLockDemo();
+
+        new Thread(()->{
+            sDemo.myLock();
+
+            System.out.println(Thread.currentThread().getName()+"一顿操作5秒...");
+            try {TimeUnit.SECONDS.sleep(5);} catch (InterruptedException e) {e.printStackTrace();}
+
+            sDemo.myUnLock();
+
+        },"A").start();
+
+        // 保证线程A先上的锁
+        try {TimeUnit.SECONDS.sleep(1);} catch (InterruptedException e) {e.printStackTrace();}
+
+        new Thread(()->{
+            sDemo.myLock();
+
+            System.out.println(Thread.currentThread().getName()+"一顿操作");
+
+            sDemo.myUnLock();
+
+        },"B").start();
+
+    }
+
+    AtomicReference atomicThreadRef = new AtomicReference<Thread>();
+    // 加锁
+    public void myLock(){
+        // 线程A进来，发现是null值，成功操作cas把自己放进去
+        // 线程B进来，发现不是null值，一直自旋等待线程A释放锁
+        System.out.println(Thread.currentThread().getName()+"尝试获取锁");
+        while (!atomicThreadRef.compareAndSet(null,Thread.currentThread())){
+
+        }
+        System.out.println(Thread.currentThread().getName()+"成功获取锁");
+    }
+
+    // 释放锁
+    public void myUnLock(){
+        // 线程A发现原子引用是自己，于是cas成功修改为null值，即释放锁
+        atomicThreadRef.compareAndSet(Thread.currentThread(),null);
+        System.out.println(Thread.currentThread().getName()+"释放锁");
+    }
+}
+123456789101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263
+```
+
+## 独占锁和共享锁是什么？举例？优缺点比较？
+
+是什么？
+
+- 独占锁：写锁，该锁只能被一个线程所持有。
+- 共享锁：读锁，该锁可被多个线程所持有。
+
+举例
+
+- ReentrantLock和sychronized都是独占锁。
+- ReentrantReadWriteLock，其读锁是共享锁，写锁是独占锁。
+
+优缺：
+
+- 共享锁保证并发读是非常高效的；读写、写读、写写过程是互斥的。
+
+## 验证读写锁ReentrantReadWriteLock
+
+并发读写不安全演示
+
+```java
+public class ReadWriteUnsafeDemo {
+
+    Map<Integer,String> map = new HashMap<>();
+
+    public void myPut(Integer key, String value){
+        System.out.println(Thread.currentThread().getName() + "\t" + "正在写入："+key);
+        map.put(key ,value);
+        System.out.println(Thread.currentThread().getName() + "\t" + "写入完成："+key);
+    }
+
+    public void myGet(Integer key){
+        System.out.println(Thread.currentThread().getName() + "\t" + "正在读取："+key);
+        String value = map.get(key);
+        System.out.println(Thread.currentThread().getName() + "\t" + "读取完成："+key+","+value);
+    }
+
+    /**
+     * 并发读写不安全演示
+     * 打印：
+     * 0	正在写入：0
+     * 2	正在写入：2
+     * 4	正在写入：4
+     * 3	正在写入：3
+     * 1	正在写入：1
+     * 3	写入完成：3
+     * 0	正在读取：0
+     * 4	写入完成：4
+     * 0	读取完成：0,0
+     * 2	写入完成：2
+     * 0	写入完成：0
+     * ...
+     * 结论：写入不是原子操作，线程不安全
+     *
+     * 只锁put不锁get会发生什么？
+     * 2	正在写入
+     * 0	正在读取
+     * 2	写入完成：2
+     * 造成写时读，不安全。没有保证写的原子性。
+     */
+    public static void main(String[] args) {
+        ReadWriteUnsafeDemo demo = new ReadWriteUnsafeDemo();
+        for(int i=0; i<5; ++i){
+            final int tmp = i;
+            new Thread(()->{
+                demo.myPut(tmp,String.valueOf(tmp));
+            },String.valueOf(i)).start();
+        }
+
+        for(int i=0; i<5; ++i){
+            final int tmp = i;
+            new Thread(()->{
+                demo.myGet(tmp);
+            },String.valueOf(i)).start();
+        }
+    }
+}
+1234567891011121314151617181920212223242526272829303132333435363738394041424344454647484950515253545556
+```
+
+验证读写锁ReentrantReadWriteLock
+
+```java
+public class ReadWriteLockDemo {
+
+    // 缓存资源都加一下volatile，保证线程间可见
+    volatile Map<Integer,String> map = new HashMap<>();
+    ReadWriteLock rwLock = new ReentrantReadWriteLock();
+
+    public void myPut(Integer key, String value){
+
+        rwLock.writeLock().lock();
+        try{
+            System.out.println(Thread.currentThread().getName() + "\t" + "正在写入");
+            map.put(key ,value);
+            System.out.println(Thread.currentThread().getName() + "\t" + "写入完成："+key);
+        }catch (Exception e){
+            e.printStackTrace();
+        }finally {
+            rwLock.writeLock().unlock();
+        }
+    }
+
+    public void myGet(Integer key){
+
+        rwLock.readLock().lock();
+        try{
+            System.out.println(Thread.currentThread().getName() + "\t" + "正在读取");
+            String value = map.get(key);
+            System.out.println(Thread.currentThread().getName() + "\t" + "读取完成："+value);
+        }catch (Exception e){
+            e.printStackTrace();
+        }finally {
+            rwLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * 要求：
+     * - 读可并发
+     * - 写和任何操作互斥
+     * 核心：ReentrantReadWriteLock + volatile
+     * 打印：
+     * 2	正在写入
+     * 2	写入完成：2
+     * 3	正在写入
+     * 3	写入完成：3
+     * 4	正在写入
+     * 4	写入完成：4
+     * 4	正在读取
+     * 2	正在读取
+     * 1	正在读取
+     * 1	读取完成：1
+     * 3	正在读取
+     * 结论：读写锁保证了写原子性，读并发
+     */
+    public static void main(String[] args) {
+        ReadWriteLockDemo demo = new ReadWriteLockDemo();
+        for(int i=0; i<5; ++i){
+            final int tmp = i;
+            new Thread(()->{
+                demo.myPut(tmp,String.valueOf(tmp));
+            },String.valueOf(i)).start();
+        }
+
+        for(int i=0; i<5; ++i){
+            final int tmp = i;
+            new Thread(()->{
+                demo.myGet(tmp);
+            },String.valueOf(i)).start();
+        }
+    }
+}
+12345678910111213141516171819202122232425262728293031323334353637383940414243444546474849505152535455565758596061626364656667686970
+```
+
+## 什么是乐观锁/悲观锁？举例？
+
+悲观锁
+
+- 总是假设最坏的情况，每次去拿数据的时候都认为别人会修改，所以每次在拿数据的时候都会上锁，Java中synchronized和ReentrantLock等**独占锁就是悲观锁思想的实现**。
+
+乐观锁
+
+- 总是假设最好的情况，每次去拿数据的时候都认为别人不会修改，所以不会上锁，采用版本号+cas的方式去保证线程安全。乐观锁适用于多读写少的应用类型，这样可以提高吞吐量。atomic包的类就是基于cas实现乐观锁的。
+
+## 什么是乐观读/悲观读？
+
+- 悲观读：在没有任何读写锁的时候才能取得写入的锁，可用于实现悲观读取（读优先，没有读时才能写），读多写少的场景下可能会出现线程饥饿。
+- 乐观读：如果读多写少，就乐观的认为读写同时发生的情况少，因此不采用完全锁定的方式，而是采用cas实现乐观锁。
+
+## ReentrantReadWriteLock是乐观读还是悲观读？
+
+读优先：在没有任何读写锁的时候才能取得写入的锁，可用于实现悲观读取（读优先，没有读时才能写），读多写少的场景下可能会出现线程饥饿。
+
+## ! StempedLock作用？
+
+参考：blog/2018/10/27/20181027234153307/#7-5-ReentrantLock与锁
+
+它控制锁有三种模式（写、悲观读、乐观读）。
+
+核心代码：
+
+```java
+private final StampedLock sl = new StampedLock();
+long stamp = sl.tryOptimisticRead(); // 获得一个乐观读锁
+// stamp=0表示没有写锁入侵，
+long stamp = sl.readLock(); // 获取悲观读锁
+long stamp = lock.writeLock();// 获得写锁
+12345
+```
+
+ReentrantReadWriteLock是悲观读，读优先，而StempedLock可以指定。
+
+## synchronized和Lock的区别是什么？
+
+1. 原始构成
+   synchronized是关键字，属于JVM层面（底层通过monitor对象完成，monitorenter\monitorexit）
+   Lock是juc里具体的类，是API层面
+2. 使用方法
+   synchronized不需要手动释放锁，代码块执行完就自动释放了
+   ReentrantLock必须手动释放锁，否则可能导致死锁
+3. 等待是否可中断
+   synchronized不可中断，除非抛异常或正常执行完毕
+   ReentrantLock可中断
+   1 lock.tryLock(long timeout, TimeUnit unit)
+   2 lock.lockInterruptibly() 直接中断锁
+4. 加锁是否公平
+   synchronized非公平
+   ReentrantLock可以指定，默认非公平。
+5. 锁能否绑定多个条件（Condition）
+   synchronized没有，要么随机唤醒一个，要么唤醒全部
+   ReentrantLock实现分组唤醒，可精确唤醒。（详见AQS的Condition小节）
+   Condition condition_pro = lock.newCondition();
+   Condition condition_con = lock.newCondition();
+
+
+
+```java
+/**
+ * 锁绑定多个条件（Condition） 案例
+ * 要求：A打印3次，通知B打印4次，通知C打印5次；循环5轮；
+ *
+ * 线程   操作  资源类
+ * 判断   干活  通知
+ * 防止假唤醒while
+ */
+public class MultiConditionDemo {
+
+    public static void main(String[] args) {
+        Resources rs = new Resources();
+        new Thread(()->{
+            for (int i = 0; i < 5; i++) {
+                rs.pa3();
+            }
+        },"A").start();
+
+        new Thread(()->{
+            for (int i = 0; i < 5; i++) {
+                rs.pb4();
+            }
+        },"B").start();
+
+        new Thread(()->{
+            for (int i = 0; i < 5; i++) {
+                rs.pc5();
+            }
+        },"C").start();
+    }
+}
+
+class Resources{
+    Lock lock = new ReentrantLock();
+    String thread = "A";    // 当前线程
+    Condition cA = lock.newCondition();
+    Condition cB = lock.newCondition();
+    Condition cC = lock.newCondition();
+
+    public void pa3(){
+        lock.lock();
+        try{
+            while(!thread.equals("A")){
+                cA.await();
+            }
+            for (int i = 0; i < 3; i++) {
+                System.out.println("A打印");
+            }
+            // A做完了通知B
+            thread="B";
+            cB.signal();
+        }catch (Exception e){
+            e.printStackTrace();
+        }finally {
+            lock.unlock();
+        }
+    }
+
+    public void pb4(){
+        lock.lock();
+        try{
+            while(!thread.equals("B")){
+                cB.await();
+            }
+            for (int i = 0; i < 4; i++) {
+                System.out.println("B打印");
+            }
+            // B做完了通知C
+            thread="C";
+            cC.signal();
+        }catch (Exception e){
+            e.printStackTrace();
+        }finally {
+            lock.unlock();
+        }
+    }
+
+    public void pc5(){
+        lock.lock();
+        try{
+            while(!thread.equals("C")){
+                cC.await();
+            }
+            for (int i = 0; i < 5; i++) {
+                System.out.println("C打印");
+            }
+            // C做完了通知A
+            thread="A";
+            cA.signal();
+        }catch (Exception e){
+            e.printStackTrace();
+        }finally {
+            lock.unlock();
+        }
+    }
+}
+123456789101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263646566676869707172737475767778798081828384858687888990919293949596
+```
+
+## 
+
+```java
+/**
+ * 使用阻塞队列实现生产者消费者（不使用Lock/Condition相关的东西）。
+ * 题目：当flag=true时，启动生产者和消费者线程，一直循环做生产消费，当flag=false时，停止所有线程，程序运行结束。
+ * 测试：开启一个生产者和一个消费者，5秒钟修改flag，看执行效果。
+ * 核心：
+ *  num++操作改成 AtomicInteger;
+ *  BlockingQueue不写具体类，留接口给外部；
+ *  flag标记对所有线程可见，所以需要volatile。
+ *  打印：
+ *  启动生产者
+ * 启动消费者
+ * 生产者	成功入队	蛋糕1
+ * 消费者	成功出队	蛋糕1
+ * 生产者	成功入队	蛋糕2
+ * 消费者	成功出队	蛋糕2
+ * 生产者	成功入队	蛋糕3
+ * 消费者	成功出队	蛋糕3
+ * 生产者	成功入队	蛋糕4
+ * 消费者	成功出队	蛋糕4
+ * 生产者	成功入队	蛋糕5
+ * 消费者	成功出队	蛋糕5
+ * 消费者	消费等待超过2秒，消费失败
+ */
+public class ProdConsumer_BDemo {
+    public static void main(String[] args) {
+        // 如果生产速度快，就把容量弄大点，免得经常入队失败
+        MyResource rs = new MyResource(new ArrayBlockingQueue<String>(3));
+
+        new Thread(()->{
+            System.out.println("启动"+Thread.currentThread().getName());
+            try {
+                rs.myProducer();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        },"生产者").start();
+
+        new Thread(()->{
+            System.out.println("启动"+Thread.currentThread().getName());
+            try {
+                rs.myConsumer();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        },"消费者").start();
+
+        // 5s后修改flag,结束程序
+        try {
+            TimeUnit.SECONDS.sleep(5);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        rs.STOP();
+
+    }
+}
+
+class MyResource{
+
+    private AtomicInteger atomicInteger = new AtomicInteger(0);
+    private BlockingQueue<String> blockingQueue = null;
+    private volatile boolean FLAG=true;
+
+
+    public MyResource(BlockingQueue<String> blockingQueue) {
+        this.blockingQueue = blockingQueue;
+    }
+
+    public void STOP(){
+        FLAG=false;
+    }
+
+    public void myProducer() throws InterruptedException {
+        int id;
+        String cake;
+        boolean result;
+        while (FLAG){
+            // 创建蛋糕
+            id = atomicInteger.incrementAndGet();// 蛋糕id
+            cake = "蛋糕"+id;
+            // 蛋糕入队
+            result = blockingQueue.offer(cake, 2, TimeUnit.SECONDS);
+            if(result){
+                System.out.println(Thread.currentThread().getName()+"\t成功入队\t"+cake);
+            }else {
+                // 说明队列满了
+                System.out.println(Thread.currentThread().getName()+"\t入队失败\t"+cake);
+            }
+
+            // 生产者产的慢，产一个消费者就吃一个。
+            // 生产者产的快，就会入队失败，等消费者来吃。
+            TimeUnit.SECONDS.sleep(1);
+        }
+    }
+
+    public void myConsumer() throws InterruptedException {
+        while (FLAG){
+            // 消费蛋糕
+            String cake = blockingQueue.poll(2, TimeUnit.SECONDS);
+            if(cake==null || cake.equals("")){
+                System.out.println(Thread.currentThread().getName()+"\t消费等待超过2秒，消费失败");
+                // 通知生产者也退出，不然生产者一直循环尝试入队。
+//                FLAG=false;
+//                return;
+            }else{
+                System.out.println(Thread.currentThread().getName()+"\t成功出队\t"+cake);
+            }
+            // TimeUnit.SECONDS.sleep(2);
+        }
+    }
+}
+123456789101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263646566676869707172737475767778798081828384858687888990919293949596979899100101102103104105106107108109110111112
+```
 
 # JVM
 
@@ -1202,7 +2403,7 @@ public static SingletonDemo getInstance() {
 
 因此多线程下，当线程a访问instance!=null时，instance实例却未必初始化完成（还没做2）；此时切到线程b，线程b直接取intance实例，这个实例是未完成初始化的实例。因此线程不安全。
 
-###### 如何解决？
+#### 如何解决？
 
 ```java
 private static volatile SingletonDemo instance = null;
@@ -2562,27 +3763,6 @@ class Number1{
 2、lock+await+signalAll(Condition)
 
 ```java
-public class ProdConsumer_TDemo2 {
-
-    public static void main(String[] args) {
-        Number2 number = new Number2();
-
-        new Thread(()->{
-            for (int i = 0; i < 5; i++) {
-                number.plus();
-            }
-        },"A").start();
-
-        new Thread(()->{
-            for (int i = 0; i < 5; i++) {
-                number.reduce();
-            }
-        },"B").start();
-    }
-
-
-}
-
 class Number2{
     private int num = 0;
     Lock lock = new ReentrantLock();
@@ -2625,8 +3805,26 @@ class Number2{
         }finally {
             lock.unlock();
         }
-
     }
+}
+public class ProdConsumer_TDemo2 {
+
+    public static void main(String[] args) {
+        Number2 number = new Number2();
+
+        new Thread(()->{
+            for (int i = 0; i < 5; i++) {
+                number.plus();
+            }
+        },"A").start();
+
+        new Thread(()->{
+            for (int i = 0; i < 5; i++) {
+                number.reduce();
+            }
+        },"B").start();
+    }
+
 
 }
 ```
