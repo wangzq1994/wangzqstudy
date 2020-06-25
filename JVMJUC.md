@@ -686,68 +686,6 @@ Future.get方法会使取结果的线程进入阻塞状态，知道线程执行�
 		2.尽可能多开，公式：cpu核数*2。
 		3.公式2：cpu核数/（1-阻塞系数），阻塞系数在0.8~0.9之间。8核就是8/(1-0.9) = 80个线程。
 
-#### 死锁是什么？产生死锁的主要原因？
-
-多线程抢资源造成互相等待
-
-原因：
-
-1. 系统资源不足
-2. 进程推荐顺序不合适
-3. 资源分配不当
-
-#### 死锁案例（demo）
-
-```java
-class HoldLockThread implements Runnable{
-    private String lockA;
-    private String lockB;
-
-    public HoldLockThread(String lockA, String lockB) {
-        this.lockA = lockA;
-        this.lockB = lockB;
-    }
-
-
-    @Override
-    public void run() {
-        synchronized (lockA){
-            System.out.println(Thread.currentThread().getName()+"\t持有"+lockA+"\t等待"+lockB);
-
-            try {TimeUnit.SECONDS.sleep(1);} catch (InterruptedException e) {e.printStackTrace(); }
-            synchronized (lockB){
-                System.out.println(Thread.currentThread().getName()+"\t持有"+lockB+"\t等待"+lockA);
-            }
-
-        }
-    }
-}
-
-/**
- * 死锁案例
- * 打印：
- * A   持有钥匙1  等待钥匙2
- * B   持有钥匙2  等待钥匙1
- */
-public class DeadLockDemo {
-
-    public static void main(String[] args) {
-        new Thread(new HoldLockThread("钥匙1","钥匙2"),"A").start();
-        new Thread(new HoldLockThread("钥匙2","钥匙1"),"B").start();
-
-    }
-}
-```
-
-## 怎么排查死锁问题？使用过哪些命令行工具？
-
-解决：
-jps -l // 查看java进程 进程号
-jstack 进程号 // 查看堆栈信息
-打印：Found 1 deadlock.
-
-![image-20200624192336321](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200624192336321.png)
-
 # CAS
 
 提问线路：CAS—> Unsafe—> CAS底层原理 —> 原子引用更新 —> 如何规避ABA问题
@@ -1261,679 +1199,6 @@ volatile Node<K,V>[] table;
 - HashMap和ConcurrentHashMap对比
 - HashMap和HashTable的对比
 - HashTable和ConcurrentHashMap对比
-
-# Java锁
-
-## Java 15锁，列举一些？
-
-1.公平锁 / 非公平锁
-2.可重入锁 / 不可重入锁
-3.独享锁 / 共享锁
-4.互斥锁 / 读写锁
-5.乐观锁 / 悲观锁
-6.分段锁
-7.偏向锁 / 轻量级锁 / 重量级锁
-8.自旋锁
-
-## 公平和非公平锁是什么？两者区别（优缺点）？两种锁举例？
-
-是什么？
-
-- 公平锁：多个线程按照申请锁的顺序来获取锁。
-- 非公平锁：多个线程获取锁的顺序不是按照申请舒顺序来的，有可能后申请的线程比先申请的线程优先获取锁。
-  高并发下，有可能造成优先级反转或者饥饿现象。
-
-区别：
-
-- 公平锁：保证顺序（队列，FIFO），性能下降。
-- 非公平：先尝试直接占有锁，如果尝试失败，再采用类似公平锁的方式。优点在于吞吐量比公平锁大。
-
-举例：
-
-- ReentrantLock可以指定创建公平锁或非公平锁，无参构造默认创建非公平锁。
-- synchronized是非公平的。
-
-## 可重入锁是什么？与不可重入的区别？可重入锁举例？作用？实现原理？
-
-是什么？
-
-- 也叫递归锁
-- 当一个线程获取某个对象锁后，可以再次获取同一把对象锁。
-- 即，线程可进入任何他所拥有的对象锁所同步着的代码块。
-
-区别？
-
-```java
-public synchronized  void m1(){
-      m1();
-}
-123
-```
-
-- 可重入锁：某线程进入外层m1后，可以再次进入递归m1方法。也叫递归锁。
-- 不可重入锁：某线程进入外部m1后，不可再进如内部m1，必须等待锁释放。这里就造成了死锁。
-
-举例：
-
-- ReentrantLock/synchronized就是典型的可重入锁
-
-作用：
-
-- 避免死锁。案例：递归
-
-实现原理：
-
-- 计数器：进入最外层计数器=1，每递归一次，计数器+1，每退出一层，计数器-1，直到计数器=0，说明退出了最外层，此时该线程释放锁对象，其他线程才能获取该锁。
-
-## 可重入锁代码验证
-
-synchronized
-
-```java
-public class SynchronizedLockDemo {
-
-    public synchronized void m1(){
-        System.out.println(Thread.currentThread().getName() + "----m1----");
-        m2();
-    }
-
-    public synchronized void m2(){
-        System.out.println(Thread.currentThread().getName() + "----m2----");
-    }
-
-    /**
-     * 可以看出，m1,m2是同一把锁，只有线程释放最外层锁，其他线程才能占用该锁。
-     * @param args
-     */
-    public static void main(String[] args) {
-        SynchronizedLockDemo rd = new SynchronizedLockDemo();
-        for (int i = 0; i < 5; i++) {
-            new Thread(()->{
-                rd.m1();
-            },String.valueOf(i)).start();
-        }
-    }
-    //0----m1----
-    //0----m2----
-    //4----m1----
-    //4----m2----
-    //3----m1----
-    //3----m2----
-    //2----m1----
-    //2----m2----
-    //1----m1----
-    //1----m2----
-}
-12345678910111213141516171819202122232425262728293031323334
-```
-
-ReentrantLock
-
-```java
-public class ReentrantLockDemo {
-
-    Lock lock = new ReentrantLock();
-
-    public void m1(){
-        lock.lock();
-//        lock.lock();
-        try {
-
-            System.out.println(Thread.currentThread().getName() + "----m1----");
-            m2();
-
-        }finally {
-            lock.unlock();
-//            lock.unlock();
-        }
-    }
-
-    public void m2(){
-        lock.lock();
-        try {
-
-            System.out.println(Thread.currentThread().getName() + "----m2----");
-
-        }finally {
-            lock.unlock();
-        }
-    }
-
-    /**
-     * 锁要成对出现，否则：
-     *  - 多一个lock.lock()会造成锁无法释放,程序卡住
-     *  - 多一个lock.unlock()直接报错
-     */
-    public static void main(String[] args) {
-        ReentrantLockDemo rd = new ReentrantLockDemo();
-        for (int i = 0; i < 5; i++) {
-            new Thread(()->{
-                rd.m1();
-            },String.valueOf(i)).start();
-        }
-        //0----m1----
-        //0----m2----
-        //2----m1----
-        //2----m2----
-        //1----m1----
-        //1----m2----
-        //3----m1----
-        //3----m2----
-        //4----m1----
-        //4----m2----
-    }
-}
-1234567891011121314151617181920212223242526272829303132333435363738394041424344454647484950515253
-```
-
-## 自旋锁是什么？优点？缺点？
-
-- 自旋锁（spinlock）是指尝试获取锁的对象不会立即阻塞，而是采用循环的方式取尝试获取锁。好处是减少线程上下文切换的消耗，缺点是循环会消耗CPU
-
-## 手写一个自旋锁
-
-```java
-public class SpinLockDemo {
-
-    /**
-     * 手写自旋锁
-     * 自旋锁的核心：while+cas+原子引用线程
-     *
-     * A线程加锁，一顿操作5秒钟，解锁。B线程一直自旋等待A线程释放锁，然后获取锁。
-     * 打印结果：
-     * A尝试获取锁
-     * A成功获取锁
-     * A一顿操作5秒...
-     * B尝试获取锁
-     * A释放锁
-     * B成功获取锁
-     * B一顿操作
-     * B释放锁
-     */
-    public static void main(String[] args) {
-        SpinLockDemo sDemo = new SpinLockDemo();
-
-        new Thread(()->{
-            sDemo.myLock();
-
-            System.out.println(Thread.currentThread().getName()+"一顿操作5秒...");
-            try {TimeUnit.SECONDS.sleep(5);} catch (InterruptedException e) {e.printStackTrace();}
-
-            sDemo.myUnLock();
-
-        },"A").start();
-
-        // 保证线程A先上的锁
-        try {TimeUnit.SECONDS.sleep(1);} catch (InterruptedException e) {e.printStackTrace();}
-
-        new Thread(()->{
-            sDemo.myLock();
-
-            System.out.println(Thread.currentThread().getName()+"一顿操作");
-
-            sDemo.myUnLock();
-
-        },"B").start();
-
-    }
-
-    AtomicReference atomicThreadRef = new AtomicReference<Thread>();
-    // 加锁
-    public void myLock(){
-        // 线程A进来，发现是null值，成功操作cas把自己放进去
-        // 线程B进来，发现不是null值，一直自旋等待线程A释放锁
-        System.out.println(Thread.currentThread().getName()+"尝试获取锁");
-        while (!atomicThreadRef.compareAndSet(null,Thread.currentThread())){
-
-        }
-        System.out.println(Thread.currentThread().getName()+"成功获取锁");
-    }
-
-    // 释放锁
-    public void myUnLock(){
-        // 线程A发现原子引用是自己，于是cas成功修改为null值，即释放锁
-        atomicThreadRef.compareAndSet(Thread.currentThread(),null);
-        System.out.println(Thread.currentThread().getName()+"释放锁");
-    }
-}
-123456789101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263
-```
-
-## 独占锁和共享锁是什么？举例？优缺点比较？
-
-是什么？
-
-- 独占锁：写锁，该锁只能被一个线程所持有。
-- 共享锁：读锁，该锁可被多个线程所持有。
-
-举例
-
-- ReentrantLock和sychronized都是独占锁。
-- ReentrantReadWriteLock，其读锁是共享锁，写锁是独占锁。
-
-优缺：
-
-- 共享锁保证并发读是非常高效的；读写、写读、写写过程是互斥的。
-
-## 验证读写锁ReentrantReadWriteLock
-
-并发读写不安全演示
-
-```java
-public class ReadWriteUnsafeDemo {
-
-    Map<Integer,String> map = new HashMap<>();
-
-    public void myPut(Integer key, String value){
-        System.out.println(Thread.currentThread().getName() + "\t" + "正在写入："+key);
-        map.put(key ,value);
-        System.out.println(Thread.currentThread().getName() + "\t" + "写入完成："+key);
-    }
-
-    public void myGet(Integer key){
-        System.out.println(Thread.currentThread().getName() + "\t" + "正在读取："+key);
-        String value = map.get(key);
-        System.out.println(Thread.currentThread().getName() + "\t" + "读取完成："+key+","+value);
-    }
-
-    /**
-     * 并发读写不安全演示
-     * 打印：
-     * 0	正在写入：0
-     * 2	正在写入：2
-     * 4	正在写入：4
-     * 3	正在写入：3
-     * 1	正在写入：1
-     * 3	写入完成：3
-     * 0	正在读取：0
-     * 4	写入完成：4
-     * 0	读取完成：0,0
-     * 2	写入完成：2
-     * 0	写入完成：0
-     * ...
-     * 结论：写入不是原子操作，线程不安全
-     *
-     * 只锁put不锁get会发生什么？
-     * 2	正在写入
-     * 0	正在读取
-     * 2	写入完成：2
-     * 造成写时读，不安全。没有保证写的原子性。
-     */
-    public static void main(String[] args) {
-        ReadWriteUnsafeDemo demo = new ReadWriteUnsafeDemo();
-        for(int i=0; i<5; ++i){
-            final int tmp = i;
-            new Thread(()->{
-                demo.myPut(tmp,String.valueOf(tmp));
-            },String.valueOf(i)).start();
-        }
-
-        for(int i=0; i<5; ++i){
-            final int tmp = i;
-            new Thread(()->{
-                demo.myGet(tmp);
-            },String.valueOf(i)).start();
-        }
-    }
-}
-1234567891011121314151617181920212223242526272829303132333435363738394041424344454647484950515253545556
-```
-
-验证读写锁ReentrantReadWriteLock
-
-```java
-public class ReadWriteLockDemo {
-
-    // 缓存资源都加一下volatile，保证线程间可见
-    volatile Map<Integer,String> map = new HashMap<>();
-    ReadWriteLock rwLock = new ReentrantReadWriteLock();
-
-    public void myPut(Integer key, String value){
-
-        rwLock.writeLock().lock();
-        try{
-            System.out.println(Thread.currentThread().getName() + "\t" + "正在写入");
-            map.put(key ,value);
-            System.out.println(Thread.currentThread().getName() + "\t" + "写入完成："+key);
-        }catch (Exception e){
-            e.printStackTrace();
-        }finally {
-            rwLock.writeLock().unlock();
-        }
-    }
-
-    public void myGet(Integer key){
-
-        rwLock.readLock().lock();
-        try{
-            System.out.println(Thread.currentThread().getName() + "\t" + "正在读取");
-            String value = map.get(key);
-            System.out.println(Thread.currentThread().getName() + "\t" + "读取完成："+value);
-        }catch (Exception e){
-            e.printStackTrace();
-        }finally {
-            rwLock.readLock().unlock();
-        }
-    }
-
-    /**
-     * 要求：
-     * - 读可并发
-     * - 写和任何操作互斥
-     * 核心：ReentrantReadWriteLock + volatile
-     * 打印：
-     * 2	正在写入
-     * 2	写入完成：2
-     * 3	正在写入
-     * 3	写入完成：3
-     * 4	正在写入
-     * 4	写入完成：4
-     * 4	正在读取
-     * 2	正在读取
-     * 1	正在读取
-     * 1	读取完成：1
-     * 3	正在读取
-     * 结论：读写锁保证了写原子性，读并发
-     */
-    public static void main(String[] args) {
-        ReadWriteLockDemo demo = new ReadWriteLockDemo();
-        for(int i=0; i<5; ++i){
-            final int tmp = i;
-            new Thread(()->{
-                demo.myPut(tmp,String.valueOf(tmp));
-            },String.valueOf(i)).start();
-        }
-
-        for(int i=0; i<5; ++i){
-            final int tmp = i;
-            new Thread(()->{
-                demo.myGet(tmp);
-            },String.valueOf(i)).start();
-        }
-    }
-}
-12345678910111213141516171819202122232425262728293031323334353637383940414243444546474849505152535455565758596061626364656667686970
-```
-
-## 什么是乐观锁/悲观锁？举例？
-
-悲观锁
-
-- 总是假设最坏的情况，每次去拿数据的时候都认为别人会修改，所以每次在拿数据的时候都会上锁，Java中synchronized和ReentrantLock等**独占锁就是悲观锁思想的实现**。
-
-乐观锁
-
-- 总是假设最好的情况，每次去拿数据的时候都认为别人不会修改，所以不会上锁，采用版本号+cas的方式去保证线程安全。乐观锁适用于多读写少的应用类型，这样可以提高吞吐量。atomic包的类就是基于cas实现乐观锁的。
-
-## 什么是乐观读/悲观读？
-
-- 悲观读：在没有任何读写锁的时候才能取得写入的锁，可用于实现悲观读取（读优先，没有读时才能写），读多写少的场景下可能会出现线程饥饿。
-- 乐观读：如果读多写少，就乐观的认为读写同时发生的情况少，因此不采用完全锁定的方式，而是采用cas实现乐观锁。
-
-## ReentrantReadWriteLock是乐观读还是悲观读？
-
-读优先：在没有任何读写锁的时候才能取得写入的锁，可用于实现悲观读取（读优先，没有读时才能写），读多写少的场景下可能会出现线程饥饿。
-
-## ! StempedLock作用？
-
-参考：blog/2018/10/27/20181027234153307/#7-5-ReentrantLock与锁
-
-它控制锁有三种模式（写、悲观读、乐观读）。
-
-核心代码：
-
-```java
-private final StampedLock sl = new StampedLock();
-long stamp = sl.tryOptimisticRead(); // 获得一个乐观读锁
-// stamp=0表示没有写锁入侵，
-long stamp = sl.readLock(); // 获取悲观读锁
-long stamp = lock.writeLock();// 获得写锁
-12345
-```
-
-ReentrantReadWriteLock是悲观读，读优先，而StempedLock可以指定。
-
-## synchronized和Lock的区别是什么？
-
-1. 原始构成
-   synchronized是关键字，属于JVM层面（底层通过monitor对象完成，monitorenter\monitorexit）
-   Lock是juc里具体的类，是API层面
-2. 使用方法
-   synchronized不需要手动释放锁，代码块执行完就自动释放了
-   ReentrantLock必须手动释放锁，否则可能导致死锁
-3. 等待是否可中断
-   synchronized不可中断，除非抛异常或正常执行完毕
-   ReentrantLock可中断
-   1 lock.tryLock(long timeout, TimeUnit unit)
-   2 lock.lockInterruptibly() 直接中断锁
-4. 加锁是否公平
-   synchronized非公平
-   ReentrantLock可以指定，默认非公平。
-5. 锁能否绑定多个条件（Condition）
-   synchronized没有，要么随机唤醒一个，要么唤醒全部
-   ReentrantLock实现分组唤醒，可精确唤醒。（详见AQS的Condition小节）
-   Condition condition_pro = lock.newCondition();
-   Condition condition_con = lock.newCondition();
-
-
-
-```java
-/**
- * 锁绑定多个条件（Condition） 案例
- * 要求：A打印3次，通知B打印4次，通知C打印5次；循环5轮；
- *
- * 线程   操作  资源类
- * 判断   干活  通知
- * 防止假唤醒while
- */
-public class MultiConditionDemo {
-
-    public static void main(String[] args) {
-        Resources rs = new Resources();
-        new Thread(()->{
-            for (int i = 0; i < 5; i++) {
-                rs.pa3();
-            }
-        },"A").start();
-
-        new Thread(()->{
-            for (int i = 0; i < 5; i++) {
-                rs.pb4();
-            }
-        },"B").start();
-
-        new Thread(()->{
-            for (int i = 0; i < 5; i++) {
-                rs.pc5();
-            }
-        },"C").start();
-    }
-}
-
-class Resources{
-    Lock lock = new ReentrantLock();
-    String thread = "A";    // 当前线程
-    Condition cA = lock.newCondition();
-    Condition cB = lock.newCondition();
-    Condition cC = lock.newCondition();
-
-    public void pa3(){
-        lock.lock();
-        try{
-            while(!thread.equals("A")){
-                cA.await();
-            }
-            for (int i = 0; i < 3; i++) {
-                System.out.println("A打印");
-            }
-            // A做完了通知B
-            thread="B";
-            cB.signal();
-        }catch (Exception e){
-            e.printStackTrace();
-        }finally {
-            lock.unlock();
-        }
-    }
-
-    public void pb4(){
-        lock.lock();
-        try{
-            while(!thread.equals("B")){
-                cB.await();
-            }
-            for (int i = 0; i < 4; i++) {
-                System.out.println("B打印");
-            }
-            // B做完了通知C
-            thread="C";
-            cC.signal();
-        }catch (Exception e){
-            e.printStackTrace();
-        }finally {
-            lock.unlock();
-        }
-    }
-
-    public void pc5(){
-        lock.lock();
-        try{
-            while(!thread.equals("C")){
-                cC.await();
-            }
-            for (int i = 0; i < 5; i++) {
-                System.out.println("C打印");
-            }
-            // C做完了通知A
-            thread="A";
-            cA.signal();
-        }catch (Exception e){
-            e.printStackTrace();
-        }finally {
-            lock.unlock();
-        }
-    }
-}
-123456789101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263646566676869707172737475767778798081828384858687888990919293949596
-```
-
-## 
-
-```java
-/**
- * 使用阻塞队列实现生产者消费者（不使用Lock/Condition相关的东西）。
- * 题目：当flag=true时，启动生产者和消费者线程，一直循环做生产消费，当flag=false时，停止所有线程，程序运行结束。
- * 测试：开启一个生产者和一个消费者，5秒钟修改flag，看执行效果。
- * 核心：
- *  num++操作改成 AtomicInteger;
- *  BlockingQueue不写具体类，留接口给外部；
- *  flag标记对所有线程可见，所以需要volatile。
- *  打印：
- *  启动生产者
- * 启动消费者
- * 生产者	成功入队	蛋糕1
- * 消费者	成功出队	蛋糕1
- * 生产者	成功入队	蛋糕2
- * 消费者	成功出队	蛋糕2
- * 生产者	成功入队	蛋糕3
- * 消费者	成功出队	蛋糕3
- * 生产者	成功入队	蛋糕4
- * 消费者	成功出队	蛋糕4
- * 生产者	成功入队	蛋糕5
- * 消费者	成功出队	蛋糕5
- * 消费者	消费等待超过2秒，消费失败
- */
-public class ProdConsumer_BDemo {
-    public static void main(String[] args) {
-        // 如果生产速度快，就把容量弄大点，免得经常入队失败
-        MyResource rs = new MyResource(new ArrayBlockingQueue<String>(3));
-
-        new Thread(()->{
-            System.out.println("启动"+Thread.currentThread().getName());
-            try {
-                rs.myProducer();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        },"生产者").start();
-
-        new Thread(()->{
-            System.out.println("启动"+Thread.currentThread().getName());
-            try {
-                rs.myConsumer();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        },"消费者").start();
-
-        // 5s后修改flag,结束程序
-        try {
-            TimeUnit.SECONDS.sleep(5);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
-        rs.STOP();
-
-    }
-}
-
-class MyResource{
-
-    private AtomicInteger atomicInteger = new AtomicInteger(0);
-    private BlockingQueue<String> blockingQueue = null;
-    private volatile boolean FLAG=true;
-
-
-    public MyResource(BlockingQueue<String> blockingQueue) {
-        this.blockingQueue = blockingQueue;
-    }
-
-    public void STOP(){
-        FLAG=false;
-    }
-
-    public void myProducer() throws InterruptedException {
-        int id;
-        String cake;
-        boolean result;
-        while (FLAG){
-            // 创建蛋糕
-            id = atomicInteger.incrementAndGet();// 蛋糕id
-            cake = "蛋糕"+id;
-            // 蛋糕入队
-            result = blockingQueue.offer(cake, 2, TimeUnit.SECONDS);
-            if(result){
-                System.out.println(Thread.currentThread().getName()+"\t成功入队\t"+cake);
-            }else {
-                // 说明队列满了
-                System.out.println(Thread.currentThread().getName()+"\t入队失败\t"+cake);
-            }
-
-            // 生产者产的慢，产一个消费者就吃一个。
-            // 生产者产的快，就会入队失败，等消费者来吃。
-            TimeUnit.SECONDS.sleep(1);
-        }
-    }
-
-    public void myConsumer() throws InterruptedException {
-        while (FLAG){
-            // 消费蛋糕
-            String cake = blockingQueue.poll(2, TimeUnit.SECONDS);
-            if(cake==null || cake.equals("")){
-                System.out.println(Thread.currentThread().getName()+"\t消费等待超过2秒，消费失败");
-                // 通知生产者也退出，不然生产者一直循环尝试入队。
-//                FLAG=false;
-//                return;
-            }else{
-                System.out.println(Thread.currentThread().getName()+"\t成功出队\t"+cake);
-            }
-            // TimeUnit.SECONDS.sleep(2);
-        }
-    }
-}
-123456789101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263646566676869707172737475767778798081828384858687888990919293949596979899100101102103104105106107108109110111112
-```
 
 # JVM
 
@@ -3373,6 +2638,70 @@ ReentrantReadWriteLock是悲观读，读优先，而StempedLock可以指定。
 	ReentrantLock实现分组唤醒，可精确唤醒。（详见AQS的Condition小节）
 	Condition condition_pro = lock.newCondition();
 	Condition condition_con = lock.newCondition();
+
+## 死锁是什么？产生死锁的主要原因？
+
+多线程抢资源造成互相等待
+
+原因：
+
+1. 系统资源不足
+2. 进程推荐顺序不合适
+3. 资源分配不当
+
+## 死锁案例（demo）
+
+```java
+class HoldLockThread implements Runnable{
+    private String lockA;
+    private String lockB;
+
+    public HoldLockThread(String lockA, String lockB) {
+        this.lockA = lockA;
+        this.lockB = lockB;
+    }
+
+
+    @Override
+    public void run() {
+        synchronized (lockA){
+            System.out.println(Thread.currentThread().getName()+"\t持有"+lockA+"\t等待"+lockB);
+
+            try {TimeUnit.SECONDS.sleep(1);} catch (InterruptedException e) {e.printStackTrace(); }
+            synchronized (lockB){
+                System.out.println(Thread.currentThread().getName()+"\t持有"+lockB+"\t等待"+lockA);
+            }
+
+        }
+    }
+}
+
+/**
+ * 死锁案例
+ * 打印：
+ * A   持有钥匙1  等待钥匙2
+ * B   持有钥匙2  等待钥匙1
+ */
+public class DeadLockDemo {
+
+    public static void main(String[] args) {
+        new Thread(new HoldLockThread("钥匙1","钥匙2"),"A").start();
+        new Thread(new HoldLockThread("钥匙2","钥匙1"),"B").start();
+
+    }
+}
+```
+
+## 怎么排查死锁问题？使用过哪些命令行工具？
+
+解决：
+jps -l // 查看java进程 进程号
+jstack 进程号 // 查看堆栈信息
+打印：Found 1 deadlock.
+
+![image-20200624192336321](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200624192336321.png)
+
+
 
 # AQS
 
