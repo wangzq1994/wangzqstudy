@@ -1870,33 +1870,68 @@ JVM的Server/Client模式是什么？
 
 ## Parallel (Parallel Scavenge)
 
+使用复制算法,也是一个并行的多线程的垃圾收集器,俗称 吞吐量优先的收集器
+
+- **Java8默认配置**
+- 使用复制算法
+- 新生代和老年代都用并行的
+- N:N
+
+**与ParNew相比，为什么引入Parallel？**
+
+![image-20200627223236214](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200627223236214.png)
+
+![image-20200627223328679](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200627223328679.png)
+
+- 吞吐量、自适应调节
+
+## Parallel Old
+
+- 目的是为了在老年代同样提供吞吐量优先
+
+配置
+
+![image-20200627223555331](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200627223555331.png)
+
+## CMS
+
+- 并发标记清除  一种以获得最短回收停顿时间为目标的收集器
+- 目的是获得最短回收时间，适合b/s的网站，重视响应速度。是G1出现之前大型应用首选。
+- 并发搜集停顿低，并发指与用户线程一起执行
+
+开启组合
+
+![image-20200627224305203](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200627224305203.png)
+
+四步过程：
+
+- 初始标记：标记GC ROOTs的关联对象，速度很快，会暂停工作线程
+- 并发标记：进行GC ROOTs的跟踪过程，和用户线程一起工作，不需要暂停工作线程
+- 重新标记：修正标记记录（修正期间因用户继续运行导致标记变动的小部分对象的标记记录），会暂停。
+
+- 并发清除：和用户线程一起。清除GC不可达对象
 
 
+将工作细分，将耗时最长的**并发标记**和**并发清除**两个过程与用户线程一起工作，减少停顿。
 
+优缺点：
 
+- 优：并发搜集停顿低
+- 缺：
+  - 并发对CPU压力大(GC和工作一起干)；（必须在老年代堆耗尽前GC，否则失败会启动串行GC，造成大停顿）
+  - 导致碎片（因为没有整理）
 
+## Serial Old(了解)
 
+- 串行的老年代，单线程，使用标记-整理算法
+- client模式默认，CMS后备方案
+- java8实际中已经弃用了
 
+# 如何选择垃圾收集器？
 
+![image-20200627230037420](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200627230037420.png)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+![image-20200627230241525](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200627230241525.png)
 
 
 
