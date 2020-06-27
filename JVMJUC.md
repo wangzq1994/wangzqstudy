@@ -1,5 +1,3 @@
-![image-20200624193534268](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200624193534268.png)JVMJUC学习
-
 ### 进程和线程
 
 **进程与线程最主要的区别是它们是操作系统管理资源的不同方式的体现。** 准确来说进程与线程属于衍生关系。 进程是操作系统执行程序的一次过程,在这个过程中可能会产生多个线程。
@@ -1204,10 +1202,9 @@ volatile Node<K,V>[] table;
 
 ![image-20200613173015963](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200613173015963.png)
 
-JDK8之前:（图中灰色的表示是私有且没有GC垃圾回收）
+灰色：线程私有，内存很小（kb），不存在垃圾回收（因为生命周期随线程生死）。
 
-- 线程私有的部分有:程序计数器(PC寄存器),JAVA虚拟机栈,本地方法栈(native)。
-- 线程共享部分有: GC堆,永久代(是方法区的一种实现)。
+橘色：线程共享，存在垃圾回收，大部分垃圾回收都是收的堆。
 
 JDK8之后:
 
@@ -1250,21 +1247,108 @@ native 标注的方法 是调用第三方的函数库 或者 底层操作系统�
 
 ##### 永久带(元空间)
 
-![image-20200615211446650](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200615211446650.png)
+98%的对象都是临时对象
 
-![image-20200615211813266](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200615211813266.png)
+**方法区和永久代**
 
-![image-20200615211917053](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200615211917053.png)
+​       1.方法区：是JVM的一种规范，存放类信息、常量、静态变量、即时编译器编译后的代码等；
+​		2.永久代：是HotSpot的一种具体实现，实际指的就是方法区
+**关于永久代：**
 
-**字符串常量池在jdk7已经从永久代转移到了堆内存之中。**
+​	1.方法区（Method Area）和堆一样，是各个线程共享的内存区域
+​	2.虽然JVM规范将方法区描述为堆的一个逻辑部分，但它却还有一个别名叫做Non-Heap(非堆)，目的就是要和堆		分开。
+​	3.对于HotSpot虚拟机，很多开发者习惯将方法区称之为“永久代(Parmanent Gen)” 。但严格来说，永久代是方	法区的一个实现
+​	4.永久存储区（jdk7有）是一个常驻内存区域，用于存放JDK自身所携带的 Class,Interface 的元数据，被装载进	此区域的数据是不会被垃圾回收器回收掉的，关闭 JVM 才会释放此区域所占用的内存。
+​	5.Java8将永久代取消了，变成元空间。
+
+##### **字符串常量池在jdk7已经从永久代转移到了堆内存之中。**
 
 **无论是永久代还是元空间，都有可能发生OOM。**
 
+**String对象与常量池**
 
+```java
+/*String s1 = new String(“abc”)做了如下事情：
+	1、在常量池中创建了“abc”
+	2、在java堆中创建了new String(“abc”)对象，该对象指向常量池的“abc”
+	3、在java栈中创建了s1引用，指向java堆中的对象
+	如下图
+*/
+```
 
+![image-20200625163107233](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200625163107233.png)
 
+String#intern()方法
 
+intern方法会先去查询常量池中是否有字符串已经存在，如果存在，则返回常量池中的引用，这一点jdk1.6、jdk1.7一样
 
+区别在于，如果在常量池找不到对应的字符串：
+
+jdk1.6 会再将字符串拷贝到常量池，返回指向常量池的引用。
+
+jdk1.7 则不会再将字符串拷贝到常量池，而只是在常量池中生成一个对原字符串（java堆中）的引用。
+
+简单的说，就是往常量池放的东西变了：原来在常量池中找不到时，复制一个副本放到常量池，1.7后则是将在堆上的地址引用复制到常量池。
+
+```java
+
+public class StrTest {
+
+    public static void main(String[] args) {
+       /*
+        String s1 = "abc";
+        String s2 = "abc";
+        System.out.println(s1 == s2);   //true，均指向常量池中对象
+        */
+
+       /*
+        String s1 = new String("abc");
+
+        String s2 = new String("abc");
+        System.out.println(s1 == s2);   //false，两个引用指向堆中的不同对象
+        */
+
+       /*
+        String s1 = "abc";
+        String s2 = "a";
+        String s3 = "bc";
+        String s4 = s2 + s3;
+        String s5 = s2 + s3;
+        System.out.println(s1 == s4);   //false，因为s2+s3实际上是使用StringBuilder.append来完成，会生成不同的对象
+        System.out.println(s4 == s5);   //false，StringBuilder.append在堆中生成不同的对象
+        */
+
+       /*
+        String s1 = "abc";
+        final String s2 = "a";
+        final String s3 = "bc";
+        String s4 = s2 + s3;
+        System.out.println(s1 == s4);   //true，因为final变量在编译后会直接替换成对应的值，所以实际上等于s4=”a”+”bc”，而这种情况下，编译器会直接合并为s4=”abc”，所以最终s1==s4
+        */
+
+       /*
+        String s = new String("abc");
+        String s1 = "abc";
+        String s2 = new String("abc");
+        System.out.println(s == s1.intern());   //false，"abc"在常量池中已存在，s1.intern()指向常量池的字符串。而s指向堆中的字符串对象
+        System.out.println(s == s2.intern());   //false，同理
+        System.out.println(s1 == s2.intern());  //true，
+        */    
+		
+        /*
+        String str1 = new StringBuilder("a").append("bc").toString();   //会在常量池生成"a"、"bc"，在堆区生成"abc"对象，返回给str1
+        System.out.println(str1.intern() == str1);//true,str1.intern()在常量池中没找到"abc",jdk1.7之后会在常量池生成一个引用指向堆区的"abc"对象
+
+        String str2 = new StringBuilder("ja").append("va").toString();//在堆区生成"java"对象
+        String str3 = new StringBuilder("ja").append("va").toString();
+        System.out.println(str2 == str3);//false
+        System.out.println(str2.intern() == str2);//false。str2.intern()在常量池中找到了"java"，则str2.intern()指向的是常量池的"java"
+        //常量池中为什么会存在"java"这样的字符串?
+        //类加载等操作使"java"字符串加入到了常量池中
+        */
+    }
+}
+```
 
 
 
@@ -1274,7 +1358,7 @@ native 标注的方法 是调用第三方的函数库 或者 底层操作系统�
 
 ![image-20200614213534929](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200614213534929.png)
 
-###### StackOverflowError
+##### StackOverflowError
 
 当前线程执行或请求的栈的大小超过了Java 虚拟机栈的最大空间(比如递归嵌套调用太深),就可能出现StackOverflowError错误
 
@@ -1306,27 +1390,46 @@ Java虚拟机栈与程序计数器一样，都是线程私有的部分，生命�
 
 ![image-20200614220540962](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200614220540962.png)
 
+##### MinorGC的过程（复制->清空->互换）
+
 ![image-20200614220911672](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200614220911672.png)
 
-##### 堆参数调节
+##### 堆内存调优
 
-![image-20200615212854971](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200615212854971.png)
+- Xms: 设置初始分配大小，默认为物理内存的1/64
+- Xmx: 最大分配内存，默认为物理内存的1/4
+- 生产环境下Xms和Xmx的设置需要相同，理由：避免内存忽高忽低，不稳定。
 
-![image-20200615213025889](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200615213025889.png)
+IDEA下的配置
 
-- -Xms
-
-> 设置堆内存初始化大小。
-
-- -Xmx / -XX:MaxHeapSize=?
-
-> 设置堆内存最大值。
-
-![image-20200615213511260](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200615213511260.png)
+```java
+-Xms1024m -Xmx1024m -XX:+PrintGCDetails
+```
 
 ![image-20200615213622227](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200615213622227.png)
 
-##### OutOfMemoryError
+```java
+public static void main(String[] args) {
+
+        // 查看cpu核数
+        System.out.println(Runtime.getRuntime().availableProcessors());
+
+        // JVM试图使用的最大内存量
+        long maxMemory = Runtime.getRuntime().maxMemory();
+
+        // JVM中的内存总量
+        long totalMemory = Runtime.getRuntime().totalMemory();
+
+        System.out.println("Xmx: MAX_MEMORY = " + maxMemory + "（字节）、" + (maxMemory / (double)1024 / 1024) + "MB");
+        System.out.println("Xms: TOTAL_MEMORY = " + totalMemory + "（字节）、" + (totalMemory / (double)1024 / 1024) + "MB");
+
+    }
+}
+```
+
+
+
+# GC垃圾回收
 
 发生OOM的情况:
 
@@ -1457,7 +1560,385 @@ Java虚拟机栈与程序计数器一样，都是线程私有的部分，生命�
 
 ![image-20200617155837093](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200617155837093.png)
 
-#### JMM(java内存模型)
+# GC ROOTs
+
+**什么是垃圾**？**如何判断对象是否需要被回收**？
+
+**什么是垃圾？**
+
+- 不再被引用的对象
+
+如何判断对象是否需要被回收？
+
+- 引用计数法：缺点是很难解决循环互相引用
+- 可达性分析
+
+**可达性分析，哪些可作为GC ROOTs对象？**
+
+可达性分析
+
+​	1.如果一个对象到GC ROOTs没有引用链，说明次对象不可用
+​	2.给定一个集合的引用作为根，遍历对象图，能被遍历到的判为存活，否则死亡。
+**哪些可作为GC ROOTs对象？**
+
+​	1.虚拟机栈中的引用的对象（栈帧中的局部变量区）
+​	2.方法区中类的静态属性引用的对象
+​	3.方法区中常量的引用对象
+​	4.本地方法栈(Native方法)中的引用对象
+
+## JVM调优和参数配置
+
+### JVM有哪些参数类型？XX参数？
+
+JVM参数类型
+
+- 标配参数
+  - -version
+  - -help
+  - java -showversion
+- x参数
+  - -Xint  
+  - -Xcomp
+  - -Xmixed
+- xx参数（重要）
+
+xx参数
+
+- Boolean类型：
+  - 公式：`XX:+某个属性` 或者`XX:-某个属性` ，+是开启，-是关闭
+  - 是否打印GC收集细节：`-XX:-PrintGCDetails`(默认未开启)
+- kv设置类型：
+  - 公式:`-XX:属性=属性值`
+  - `XX:MetaspaceSize=128m`
+
+- jinfo：查看当前运行程序的配置
+  - 公式：`jinfo -flag 配置项 进程编号`
+  - `jinfo -flag PrintGCDetails 5988`
+  - 查看当前程序**所有的配置参数**：`jinfo -flags 5988`(**注意 这个flags 加了S** )
+
+- -Xms等价于`-XX:InitialHeapSize`，-Xmx等价于`-XX:MaxHeapSize`
+
+### 查看JVM默认值
+
+查看初试默认值
+
+- `-XX:PrintFlagsInitial`
+
+查看修改更新后的值
+
+- `-XX:PrintFlagsFinal`
+- 冒号代表被修改过
+
+查看常用参数
+
+- `-XX:PrintCommandLineFlags`
+- 能看到当前使用的垃圾回收器(重要)
+
+运行时更改参数
+
+- java -XX:+PrintFlagsFinal  -XX:MaxHeapSize=215m  T (这个是java 文件)
+
+### 项目中常用的JVM配置参数
+
+- `-Xms`
+  - 堆初始大小，默认物理内存1/64
+- `-Xmx`
+  - 堆最大分配，默认物理内存1/4
+
+- `-Xss`
+  - 设置单个线程栈的大小，默认512k~1024，等价`XX:ThreadStackSize`，默认=0表示使用初始默认值，不是空间为0
+- `-Xmn`
+  - 设置新生区大小，一般不调，默认堆空间1/3
+
+- `-XX:Metaspace`
+  - 元空间使用本地内存，不在虚拟机中，但默认大小只有20多M
+- `-XX:+PrintGCDetails`
+  - 日志分析  (GC收集日志信息那节详细有讲)
+- `-XX:SurvivorRatio`
+  - 幸存区占比，eden：s0：s1默认8：1：1
+- -XX:SurvivorRatio=4  eden：s0：s1 4：1：1(主要设置是eden的比列)
+  
+- `-XX:NewRatio`
+  - 新生区占比，默认值为`-XX:NewRatio=2`，表示新生代：老年代为1：2，默认占整个堆 1/3
+- `-XX:MaxTenuringTreshold`
+  - 设置垃圾最大年龄，默认15。在新生区幸存15次就被转移到养老区。这个值调大，就让对象留在新生区更久，则让对象最大可能在新生代就被回收。
+
+![image-20200626090156486](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200626090156486.png)
+
+**面试问常用参数  这些就足矣了**
+
+### 强/软/弱/虚 四大引用
+
+### 整体架构？四大引用的区别？
+
+java.lang.ref.*
+
+![image-20200626184616909](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200626184616909.png)
+
+- 强引用（默认支持模式）：就算OOM也不会回收。只要对象有一个引用，都不收。
+- 软引用：内存足够时不收，内存不足时回收。
+
+- 弱引用：不管内存够不够用，只要GC了都要收。
+- 虚引用：就跟没有引用一样，GC来了就被回收，多了一个finalize()通知
+  - 不能单独使用，**也无法使用get()访问对象**(返回NUll)，必须和ReferenceQueue联合使用
+  - 其意义在说明对象进入了finalization阶段，可以被GC。GC时改对象会收到一个通知，覆写finalize()方法在GC前进行一些清理工作。
+
+### 软引用/弱引用适用场景
+
+一个场景需要读取大量本地图片：
+
+- 每次从硬盘读，性能下降
+- 全部加载到内存，OOM
+
+设计思路：HashMap<图片路径，图片对象软引用>，内存不足时，会自动回收图片对象，避免OOM。
+
+### WeakHashMap
+
+- 如果key的引用被置空，GC时entry会被回收
+- 减少OOM的概率
+
+### 引用队列ReferenceQueue
+
+- 回收前，弱/软/虚引用 先放ReferenceQueue保存一下
+
+```java
+WeakReference<Object> wrf = new WeakReference<Object>(o1,referenceQueue)
+```
+
+应用场景？
+
+- 回收前对象被放入引用队列里，可做一些销毁前的操作。
+
+### 引用和GC ROOTs总结
+
+![image-20200626191737356](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200626191737356.png)
+
+# OOM
+
+### StackOverflowError
+
+举例：深度递归，没有出口。栈空间默认大小 512k --1024K
+
+是错误不是异常
+
+![image-20200627071211596](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200627071211596.png)
+
+### OutOfMemoryError：Java heap space
+
+举例：while死循环里面new对象
+
+### OutOfMemoryError：GC overhead limit exceeded
+
+![image-20200627072136500](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200627072136500.png)
+
+发生场合：大量资源用于GC，却得不到好的回收效果
+
+定义:  超过98%的时间都用来做GC并且回收了不到2%的堆内存 连续多吃 就会抛出
+
+### (重要)OutOfMemoryError：Direct buffer memory
+
+导致原因：直接把本地内存撑爆了。NIO编程，直接分配本地内存不会触发GC。
+
+![image-20200627072544710](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200627072544710.png)
+
+vm这个类可以查看MaxDirectMemory 的大小
+
+### (重要)OutOfMemoryError：unable to create new native thread
+
+高并发场景下出现，因为一个系统创建的的最大线程数是有上限的。
+
+导致原因
+
+![image-20200627074429969](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200627074429969.png)
+
+服务器级别调参：
+
+上限调整
+
+![image-20200627080008347](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200627080008347.png)
+
+修改
+
+![image-20200627080106548](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200627080106548.png)
+
+
+
+### OutOfMemoryError：Metaspace
+
+封装类信息，常量池。
+
+cglib，反射，动态生成字节码，撑爆元空间
+
+![image-20200627080509239](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200627080509239.png)
+
+# 垃圾回收器
+
+### 垃圾回收算法和垃圾回收器的关系
+
+算法是方法论，回收器是落地实现
+
+没有万能的收集器，只有最适合的收集器，进行分代收集
+
+### 4种主要垃圾收集器
+
+Serial(串行)、Parallel(多垃圾并行)、CMS(用户垃圾并行)、G1
+
+- 串行垃圾回收器Serial：为单线程设计，只使用一个线程进行垃圾回收，会暂停所有用户线程。所以**不适合服务器环境**
+- 并行垃圾回收器Parallel：多个垃圾收集器线程并行工作，搜集时用户线程也是暂停的（因为是并行搜集，所以暂停时间会比串行短），适用于科学计算/大数据 等**弱交互场景**。
+- 并发垃圾回收器CMS：并发标记清除，用户线程和垃圾收集线程同时执行（也可以交替），不需要停顿用户线程，互联网公司多用，适合**对响应时间有要求的场景**
+
+对比
+
+![image-20200627113313487](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200627113313487.png)
+
+Java8主要用这三种
+
+- G1：Java9的默认垃圾回收器，将堆内存分割为不同区域然后并发进行回收。
+
+### 查看默认垃圾收集器
+
+```
+-XX:PrintCommandLineFlags
+```
+
+**Java8默认ParallelGC**
+
+jdk有哪些默认垃圾收集器？
+
+![image-20200627114258681](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200627114258681.png)
+
+![image-20200627114324671](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200627114324671.png)
+
+SerialOldGC(已经被废弃不用了)
+
+一共7种
+
+如何配置？
+
+```java
+-XX:+UseSerialGC
+```
+
+# 7大垃圾收集器概述
+
+![image-20200627114936294](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200627114936294.png)
+
+下图表示新生代和老年代垃圾回收器的配合使用。
+
+**例如 新生代 使用serial  老年的的 serial Old 会自动被激活**
+
+![image-20200627115503276](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200627115503276.png)
+
+## 约定参数说明
+
+- DefNew : Default New Generation，默认新生代使用的垃圾回收器
+- Tenured : Old
+
+- ParNew : Parallel New Generation
+- PSYoungGen : Parallel Scavenge
+- ParOldGen : Parallel Old Generation
+
+JVM的Server/Client模式是什么？
+
+- 基本都是用Server模式的
+
+## Serial (Serial Copying)(串行)
+
+**一句话: 一个单线程的收集器 ,在进行垃圾收集时候,必须暂停其他的工作线程直到他收集结束**
+
+- 最古老，简单高效，单核下垃圾搜集效率高。
+- client模式下默认的收集器
+- -XX:+UseSerialGC，开启后Serial(Young区)+Serial Old(Old区)组合使用。
+
+- 新生代使用复制算法，老年代使用标记整理算法
+- 1:1
+
+## ParNew(Parallel New Generation)(并行)收集器
+
+**Serial收集器的多线程版的版本**
+
+- 也会暂停、是Serial的并行版
+- server模式下**新生代的默认垃圾回收**
+
+- -XX:+UseParNewGC，启用ParNew，**老年代不变**，还是Serial Old，**这种组合法已经不推荐**。常见场景是配合老年代 CMS GC使用
+- 新生代使用复制算法，老年代使用标记整理算法
+- N:1
+
+**修改垃圾线程的线程数**
+
+-XX:ParallelGCThreads    限制线程数量,默认开启和CPU数目相同的线程数
+
+## Parallel (Parallel Scavenge)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# JMM(java内存模型)
 
 ![image-20200617161306167](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200617161306167.png)
 
@@ -1997,7 +2478,7 @@ Map类似
 
 HashMap > Collections.synchronizedMap() > **ConcurrentHashMap**(这个名字不一样)
 
-## HashMap底层实现原理-jdk7
+### HashMap底层实现原理-jdk7
 
 ### HashMap的特点
 
@@ -2086,7 +2567,7 @@ HashMap计算添加元素的位置时，使用的位运算，这是特别高效�
 ​		2.接着就是HashMap那一套
 3.Segment继承jucReetrantLock，上锁方便，即分段锁。因此segment[1]锁了，不影响其他Segment单元并发。
 
-## HashMap底层实现原理-jdk8
+### HashMap底层实现原理-jdk8
 
 **与jdk7的不同的地方：**
 
@@ -2238,7 +2719,7 @@ volatile Node<K,V>[] table;
 ReentrantLock可以指定创建公平锁或非公平锁，无参构造默认创建非公平锁。
 synchronized是非公平的。
 
-# 可重入锁是什么？与不可重入的区别？可重入锁举例？作用？实现原理？
+### 可重入锁是什么？与不可重入的区别？可重入锁举例？作用？实现原理？
 
 是什么？
 
@@ -2355,11 +2836,11 @@ public class ReentrantLockDemo {
 
 ```
 
-# 自旋锁是什么？优点？缺点？
+### 自旋锁是什么？优点？缺点？
 
 - 自旋锁（spinlock）是指尝试获取锁的对象不会立即阻塞，而是采用循环的方式取尝试获取锁。好处是减少线程上下文切换的消耗，缺点是循环会消耗CPU
 
-## 手写一个自旋锁
+### 手写一个自旋锁
 
 ```java
 public class SpinLockDemo {
@@ -2427,7 +2908,7 @@ public class SpinLockDemo {
 }
 ```
 
-# (读写锁)独占锁和共享锁是什么？举例？优缺点比较？
+### (读写锁)独占锁和共享锁是什么？举例？优缺点比较？
 
 ### 是什么？
 
@@ -2581,7 +3062,7 @@ public class ReadWriteLockDemo {
 }
 ```
 
-# 什么是乐观锁/悲观锁？举例？
+### 什么是乐观锁/悲观锁？举例？
 
 **悲观锁**
 
@@ -2597,11 +3078,11 @@ public class ReadWriteLockDemo {
 
 **乐观读**：如果读多写少，就乐观的认为读写同时发生的情况少，因此不采用完全锁定的方式，而是采用cas实现乐观锁。
 
-## ReentrantReadWriteLock是乐观读还是悲观读？
+### ReentrantReadWriteLock是乐观读还是悲观读？
 
 悲观读
 
-## ! StempedLock作用？
+### ! StempedLock作用？
 
 它控制锁有三种模式（写、悲观读、乐观读）。
 
@@ -2617,7 +3098,7 @@ long stamp = lock.writeLock();// 获得写锁
 
 ReentrantReadWriteLock是悲观读，读优先，而StempedLock可以指定。
 
-## synchronized和Lock的区别是什么？
+### synchronized和Lock的区别是什么？
 
 1.原始构成
 	synchronized是关键字，属于JVM层面（底层通过monitor对象完成，monitorenter\monitorexit）
@@ -2639,7 +3120,7 @@ ReentrantReadWriteLock是悲观读，读优先，而StempedLock可以指定。
 	Condition condition_pro = lock.newCondition();
 	Condition condition_con = lock.newCondition();
 
-## 死锁是什么？产生死锁的主要原因？
+### 死锁是什么？产生死锁的主要原因？
 
 多线程抢资源造成互相等待
 
@@ -2649,7 +3130,7 @@ ReentrantReadWriteLock是悲观读，读优先，而StempedLock可以指定。
 2. 进程推荐顺序不合适
 3. 资源分配不当
 
-## 死锁案例（demo）
+### 死锁案例（demo）
 
 ```java
 class HoldLockThread implements Runnable{
@@ -2692,14 +3173,14 @@ public class DeadLockDemo {
 }
 ```
 
-## 怎么排查死锁问题？使用过哪些命令行工具？
+### 怎么排查死锁问题？使用过哪些命令行工具？
 
 解决：
 jps -l // 查看java进程 进程号
 jstack 进程号 // 查看堆栈信息
 打印：Found 1 deadlock.
 
-![image-20200624192336321](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200624192336321.png)
+![image-20200624193534268](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200624193534268.png)
 
 
 
