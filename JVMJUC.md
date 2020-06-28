@@ -1956,7 +1956,7 @@ JVM的Server/Client模式是什么？
 
 G1特点
 
-
+![image-20200628091404367](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628091404367.png)
 
 底层原理
 
@@ -1966,33 +1966,37 @@ G1特点
 - 可参数指定区域大小，默认将整个堆划分为2048个分区
 - 最大支持32M*2048=64G
 
-区域化垃圾收集器
+**区域化垃圾收集器**
+
+![image-20200628092415896](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628092415896.png)
+
+![image-20200628092442792](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628092442792.png)
+
+![image-20200628092501719](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628092501719.png)
+
+**回收步骤**
+
+YoungGC: 小区域搜集+形成连续内存块
+
+![image-20200628094701880](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628094701880.png)
+
+![image-20200628094712403](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628094712403.png)
+
+![image-20200628094733665](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628094733665.png)
+
+![image-20200628095330868](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628095330868.png)
+
+常用参数了解
+
+![image-20200628095937023](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628095937023.png)
 
 
 
+## G1和CMS相比的优势
 
+1、无内存碎片
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+2、精确控制停顿（用于设期望值、作为软目标，JVM尽可能停顿时间小于这个）
 
 # JMM(java内存模型)
 
@@ -3882,4 +3886,128 @@ class MyResource{
         }
     }
 ```
+
+# 生存服务器变慢谈谈思路和性能分析
+
+#### 整机  top  
+
+![image-20200628133718550](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628133718550.png)
+
+代表系统一分钟 五分钟 十五分钟 的平均负载值
+
+如果相加除以三再乘100%大于60% 那就是负载压力重
+
+这个命令 按键盘上的1 会出个每个核的情况和负载均衡
+
+uptime (精简)
+
+#### CPU:vmstat 
+
+vmstat -n 2 3 表示每两秒取样一次共计取样三次
+
+查看cpu 包含但不限于
+
+![image-20200628135625372](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628135625372.png)
+
+![image-20200628135649546](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628135649546.png)
+
+![image-20200628135804102](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628135804102.png)
+
+![image-20200628135911575](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628135911575.png)
+
+#### 内存:free
+
+![image-20200628140034624](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628140034624.png)
+
+![image-20200628140257996](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628140257996.png)
+
+#### 硬盘: df
+
+df -h
+
+#### 磁盘IO: iostat
+
+![image-20200628140617612](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628140617612.png)
+
+![image-20200628140514859](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628140514859.png)
+
+![image-20200628140537915](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628140537915.png)
+
+#### 网络IO:ifstat
+
+![image-20200628140735571](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628140735571.png)
+
+# 假如生成环境出现cpu过高 谈谈分析思路和定位
+
+结合linux和JDK的命令一起分析
+
+1. 先用top命令找出cpu占比最高的
+
+2. ps -ef或者jps 进一步定位 找出是那个后台程序
+
+   ![image-20200628141333259](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628141333259.png)
+
+3. 定位到具体的线程或者代码
+
+   ps -mp 进程 -o THREAD,tid.time![image-20200628141600841](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628141600841.png)
+
+   
+
+   ![image-20200628141523228](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628141523228.png)
+
+   
+
+4. 将需要的线程ID转换为16进制格式(英文小写格式)
+
+   ![image-20200628141721653](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628141721653.png)
+
+5. jstack 进程ID | grep tid(16进制线程ID小写英文)-A60
+
+![image-20200628142022237](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628142022237.png)
+
+# 对于JDK自带的JVM监控和性能分析工具用过哪些 一般你是怎么用的
+
+# GITHUB 骚操作
+
+看github优秀的框架和源码提升自己
+
+![image-20200628142957263](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628142957263.png)
+
+![image-20200628143201671](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628143201671.png)
+
+### in关键词限制搜索范围
+
+![image-20200628143526403](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628143526403.png)
+
+seckill in:name,readme
+
+### stars或fork数量关键词去查找
+
+![image-20200628144145956](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628144145956.png)
+
+![image-20200628144502451](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628144502451.png)
+
+![image-20200628144610732](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628144610732.png)
+
+![image-20200628144629523](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628144629523.png)
+
+### awesome 加强搜索  搜索优秀的框架 教程(非常重要)
+
+![image-20200628144953442](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628144953442.png)
+
+![image-20200628145209581](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628145209581.png)
+
+高亮显示一段 #L13-L23
+
+#### 在仓库项目中搜索
+
+![image-20200628145543338](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628145543338.png)
+
+#### 搜索某个地区的大佬
+
+![image-20200628145815254](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628145815254.png)
+
+
+
+
 
