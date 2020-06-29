@@ -1596,13 +1596,13 @@ JVM参数类型
   - -version
   - -help
   - java -showversion
-- x参数
+- x参数(了解)
   - -Xint  
   - -Xcomp
   - -Xmixed
 - xx参数（重要）
 
-xx参数
+xx参数(区分大小写)
 
 - Boolean类型：
   - 公式：`XX:+某个属性` 或者`XX:-某个属性` ，+是开启，-是关闭
@@ -1622,16 +1622,16 @@ xx参数
 
 查看初试默认值
 
-- `-XX:PrintFlagsInitial`
+- `java -XX:+PrintFlagsInitial`
 
 查看修改更新后的值
 
-- `-XX:PrintFlagsFinal`
+- `java -XX:+PrintFlagsFinal`
 - 冒号代表被修改过
 
 查看常用参数
 
-- `-XX:PrintCommandLineFlags`
+- `java -XX:+PrintCommandLineFlags`
 - 能看到当前使用的垃圾回收器(重要)
 
 运行时更改参数
@@ -1656,11 +1656,11 @@ xx参数
   - 日志分析  (GC收集日志信息那节详细有讲)
 - `-XX:SurvivorRatio`
   - 幸存区占比，eden：s0：s1默认8：1：1
-- -XX:SurvivorRatio=4  eden：s0：s1 4：1：1(主要设置是eden的比列)
+  - -XX:SurvivorRatio=4   eden：s0：s1  4：1：1(主要设置是eden的比列)
   
 - `-XX:NewRatio`
   - 新生区占比，默认值为`-XX:NewRatio=2`，表示新生代：老年代为1：2，默认占整个堆 1/3
-- `-XX:MaxTenuringTreshold`
+- `-XX:MaxTenuringThreshold`
   - 设置垃圾最大年龄，默认15。在新生区幸存15次就被转移到养老区。这个值调大，就让对象留在新生区更久，则让对象最大可能在新生代就被回收。
 
 ![image-20200626090156486](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200626090156486.png)
