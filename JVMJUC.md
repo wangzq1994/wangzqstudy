@@ -1650,7 +1650,7 @@ xx参数(区分大小写)
 - `-Xmn`
   - 设置新生区大小，一般不调，默认堆空间1/3
 
-- `-XX:Metaspace`
+- `-XX:MetaspaceSize`
   - 元空间使用本地内存，不在虚拟机中，但默认大小只有20多M
 - `-XX:+PrintGCDetails`
   - 日志分析  (GC收集日志信息那节详细有讲)
@@ -1737,11 +1737,11 @@ WeakReference<Object> wrf = new WeakReference<Object>(o1,referenceQueue)
 
 ### (重要)OutOfMemoryError：Direct buffer memory
 
-导致原因：直接把本地内存撑爆了。NIO编程，直接分配本地内存不会触发GC。
+导致原因：直接把本地内存撑爆了。NIO编程，直接分配本地内存不会触发GC。**主要看你写过NIO程序没**
 
 ![image-20200627072544710](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200627072544710.png)
 
-vm这个类可以查看MaxDirectMemory 的大小
+vm这个类可以查看MaxDirectMemory (直接内存)的大小默认4分之1
 
 ### (重要)OutOfMemoryError：unable to create new native thread
 
@@ -3999,11 +3999,11 @@ seckill in:name,readme
 
 高亮显示一段 #L13-L23
 
-#### 在仓库项目中搜索
+### 在仓库项目中搜索
 
 ![image-20200628145543338](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628145543338.png)
 
-#### 搜索某个地区的大佬
+### 搜索某个地区的大佬
 
 ![image-20200628145815254](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628145815254.png)
 
