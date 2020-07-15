@@ -3893,11 +3893,15 @@ class MyResource{
 
 ![image-20200628133718550](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628133718550.png)
 
-代表系统一分钟 五分钟 十五分钟 的平均负载值
+主要查看内存(mem)和cpu占比情况
+
+这个命令 按键盘上的1 会出个每个核的情况和负载均衡 重点看id 这个参数(idle空闲率 越高越高)
+
+load average(系统负载率)代表系统一分钟 五分钟 十五分钟 的平均负载值
 
 如果相加除以三再乘100%大于60% 那就是负载压力重
 
-这个命令 按键盘上的1 会出个每个核的情况和负载均衡
+
 
 uptime (精简)
 
@@ -3927,11 +3931,11 @@ df -h
 
 #### 磁盘IO: iostat
 
-![image-20200628140617612](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628140617612.png)
-
 ![image-20200628140514859](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628140514859.png)
 
 ![image-20200628140537915](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628140537915.png)
+
+**重点看红色的**
 
 #### 网络IO:ifstat
 
@@ -3966,6 +3970,18 @@ df -h
 ![image-20200628142022237](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200628142022237.png)
 
 # 对于JDK自带的JVM监控和性能分析工具用过哪些 一般你是怎么用的
+
+# 分布式锁
+
+1.mysql 并发不高 没人用
+
+2.使用zookeeper  原理是子啊zookeeper创建临时节点  别人在创建时会报错 用完后删除临时节点表示释放锁
+
+create -e /node  value    创建临时节点    去掉-e  就是持久节点   默认是持久的
+
+![image-20200711171755323](E:\mianshixuexi\wangzqstudy\JVMJUC.assets\image-20200711171755323.png)
+
+手写分布式锁   需要练习
 
 # GITHUB 骚操作
 
